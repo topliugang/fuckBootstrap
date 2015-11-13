@@ -1,0 +1,2408 @@
+package com.chinanetwork.performance.dao;
+/**
+ * 计算得分时的DAO层
+ */
+import java.sql.Connection;
+import java.sql.Date;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.util.ArrayList;
+import java.util.List;
+
+import com.chinanetwork.performance.bean.CompleteDepartmentScoreItem;
+import com.chinanetwork.performance.bean.Department;
+import com.chinanetwork.performance.bean.DepartmentKeyWork;
+import com.chinanetwork.performance.bean.DepartmentScore;
+import com.chinanetwork.performance.bean.DepartmentScoreItem;
+import com.chinanetwork.performance.bean.DepartmentScoreRecord;
+import com.chinanetwork.performance.bean.Post;
+import com.chinanetwork.performance.bean.Role;
+import com.chinanetwork.performance.bean.ScoreItemCategory;
+import com.chinanetwork.performance.bean.Staff;
+import com.chinanetwork.performance.bean.StaffScore;
+import com.chinanetwork.performance.bean.StaffScoreItem;
+import com.chinanetwork.performance.bean.StaffScoreRecord;
+import com.chinanetwork.performance.util.ConfigurationDataUtil;
+import com.chinanetwork.performance.util.DataBaseUtil;
+
+public class GetScoreDao {
+	
+//====================================================以下向重点工作打分提供 数据====================================================================================================
+	
+	/**
+	 * 负责寻找所有有重点工作打分条目的部门List
+	 * @return
+	 * @throws Exception
+	 */
+	public List<Department> getWorkDepartmentList()throws Exception{
+		List<Department> departmentList=new ArrayList<Department>();
+		String sql="select d.department_id,d.department_name,d.higher_department_id " +
+				"from department_score_item dsi,department d " +
+				"where dsi.department_id=d.department_id " +
+				"and dsi.score_category_id=(" +
+				"select score_category_id from score_category where score_category_name='重点工作'" +
+				");";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			resultSet=preparedStatement.executeQuery();
+			while(resultSet.next()){
+				Department department=new Department(resultSet.getInt("d.department_id"),
+						resultSet.getString("d.department_name"),resultSet.getInt("d.higher_department_id"));
+				departmentList.add(department);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			try {
+				DataBaseUtil.close(resultSet, preparedStatement, connection);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+		return departmentList;
+	}
+	
+	/**
+	 * 从打分记录表中查询出对于重点工作已经完成完成打分的部门
+	 */
+	public List<Department> getDepartments(List<Date> dateList)throws Exception{
+		List<Department> departments=null;
+		String sql="select d.department_id,d.department_name,d.higher_department_id,dsr.score_date " +
+				"from department_score_record dsr,department d " +
+				"where dsr.department_to_id=d.department_id " +
+				"and score_item_id in(" +
+				"select dsi.score_item_id " +
+				"from department_score_item dsi,score_category sc " +
+				"where dsi.score_category_id=sc.score_category_id " +
+				"and sc.score_category_name='重点工作'" +
+				");";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			departments=new ArrayList<Department>();
+			resultSet=preparedStatement.executeQuery();
+			while(resultSet.next()){
+				Department department=new Department(resultSet.getInt("d.department_id"),
+						resultSet.getString("d.department_name"),resultSet.getInt("higher_department_id"));
+				Date date=resultSet.getDate("dsr.score_date");
+				departments.add(department);
+				dateList.add(date);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return departments;
+	}
+	/**
+	 * 获取 现阶段 “绩效考评”中，已经有‘重点工作’打分记录的部门列表
+	 * @param startTime
+	 * @param endTime
+	 * @return
+	 * @throws Exception
+	 */
+	public List<Department> getKeyWorkNowBeScoredDepartmentList(long startTime,long endTime)throws Exception{
+		List<Department> departmentList=new ArrayList<Department>();
+		String sql="select d.department_id,d.department_name,d.higher_department_id " +
+		"from department_score_record dsr,department d " +
+		"where dsr.department_to_id=d.department_id " +
+		"and unix_timestamp(dsr.score_date) between ? and ? "+
+		"and dsr.score_item_id in(" +
+		"select dsi.score_item_id " +
+		"from department_score_item dsi,score_category sc " +
+		"where dsi.score_category_id=sc.score_category_id " +
+		"and sc.score_category_name='重点工作'" +
+		");";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setLong(1, startTime);
+			preparedStatement.setLong(2, endTime);
+			resultSet=preparedStatement.executeQuery();
+			while(resultSet.next()){
+				Department department=new Department(resultSet.getInt("d.department_id"),
+						resultSet.getString("d.department_name"),resultSet.getInt("higher_department_id"));
+				departmentList.add(department);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return departmentList;
+	}
+//-----------------------------------------------------------------------------------------------------------------------------------------------
+	/**
+	 * 负责根据从下拉列表中选择的部门名称，找出该部门所对应的重点工作条目
+	 */
+	public List<DepartmentScoreItem> getDepartmentWorkScoreItem(int departmentId)throws Exception{
+		List<DepartmentScoreItem> departmentScoreItemList=null;
+		String sql="select dsi.score_item_id,dsi.score_description,dsi.score_value,dsi.score_reference,dsi.department_id,d.department_name,d.higher_department_id," +
+				"dsi.score_category_id,sc.score_category_name,dsi.score_creation_date,dsi.score_in_use " +
+				"from department_score_item dsi,department d,score_category sc " +
+				"where dsi.department_id=d.department_id and dsi.score_category_id=sc.score_category_id and d.department_id=? " +
+				"and dsi.score_category_id=(" +
+				"select score_category_id " +
+				"from score_category " +
+				"where score_category_name='重点工作'" +
+				");";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, departmentId);
+			resultSet=preparedStatement.executeQuery();
+			departmentScoreItemList=new ArrayList<DepartmentScoreItem>();
+			while(resultSet.next()){
+				DepartmentScoreItem departmentScoreItem=new DepartmentScoreItem(resultSet.getInt("dsi.score_item_id"),"",resultSet.getString("dsi.score_description"), 
+						resultSet.getFloat("dsi.score_value"),resultSet.getString("dsi.score_reference"),"", 
+						new Department(resultSet.getInt("dsi.department_id"),resultSet.getString("d.department_name"),resultSet.getInt("d.higher_department_id")), 
+						new ScoreItemCategory(resultSet.getInt("dsi.score_category_id"),resultSet.getString("sc.score_category_name")),
+						resultSet.getDate("dsi.score_creation_date"),resultSet.getInt("dsi.score_in_use"));
+				departmentScoreItemList.add(departmentScoreItem);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			try {
+				DataBaseUtil.close(resultSet, preparedStatement, connection);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+		return departmentScoreItemList;
+	}
+//-----------------------------------------------------------------------------------------------------------------------------------------------------------
+	
+	/**
+	 * 将重点工作条目打分记录插入到部门打分记录表中
+	 * 1，打分部门
+	 * 2，被打分部门
+	 * 3，条目Id
+	 * 4，分数
+	 * 5，打分日期
+	 */
+	public void submitDepartmentWorkScore(int departmentFromId,int departmentToId,
+			int scoreItemId,float score,Date date)throws Exception{
+		String sql="insert into department_score_record(department_from_id,department_to_id,score_item_id," +
+				"score,score_date, which_year, which_month, modify_times) values (?,?,?,?,?,?,?,?);";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			
+			preparedStatement.setInt(1, departmentFromId);
+			preparedStatement.setInt(2, departmentToId);
+			preparedStatement.setInt(3, scoreItemId);
+			preparedStatement.setFloat(4, score);
+			preparedStatement.setDate(5, date);
+			preparedStatement.setInt(6, ConfigurationDataUtil.getIntegerVlaue("which_year"));
+			preparedStatement.setInt(7, ConfigurationDataUtil.getIntegerVlaue("which_month"));
+			preparedStatement.setInt(8, ConfigurationDataUtil.getIntegerVlaue("department_modify_times"));
+			
+			preparedStatement.execute();
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(preparedStatement, connection);
+		}
+	}
+	
+	/**
+	 * 根据重点条目Id，找到它所属的部门信息，而这个部门信息就是被打分部门的信息
+	 * @param scoreItemId
+	 * @return
+	 * @throws Exception
+	 */
+	public Department getDepartmentFromItemId(int scoreItemId)throws Exception{
+		Department department=null;
+		String sql="select d.department_id,d.department_name,d.higher_department_id " +
+				"from department_score_item dsi,department d " +
+				"where dsi.department_id=d.department_id and dsi.score_item_id=?;";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, scoreItemId);
+			resultSet=preparedStatement.executeQuery();
+			if(resultSet.next()){
+				department=new Department(resultSet.getInt("d.department_id"),resultSet.getString("d.department_name"),
+						resultSet.getInt("d.higher_department_id"));
+			}
+			preparedStatement.execute();
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(preparedStatement, connection);
+		}
+		return department;
+	}
+	/**
+	 * 根据打分的员工信息中的所属部门ID，找打打分部门信息
+	 * @param staff
+	 * @return
+	 * @throws Exception
+	 */
+	public Department getDepartmentFromStaff(Staff staff)throws Exception{
+		Department department=null;
+		String sql="select d.department_id,d.department_name,d.higher_department_id " +
+				"from department d,staff s " +
+				"where s.department_id=d.department_id " +
+				"and s.department_id=?";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, staff.getDepartment().getDepartmentId());
+			resultSet=preparedStatement.executeQuery();
+			if(resultSet.next()){
+				department=new Department(resultSet.getInt("d.department_id"),resultSet.getString("d.department_name"),
+						resultSet.getInt("d.higher_department_id"));
+			}
+			preparedStatement.execute();
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(preparedStatement, connection);
+		}
+		return department;
+	}
+	
+	/*
+	public DepartmentScoreItem getDepartmentScoreItemByDepartmentScoreItemId(int itemId)throws Exception{
+		DepartmentScoreItem departmentScoreItem=new DepartmentScoreItem();
+		String sql="select dsi.score_item_id,dsi.score_item_name,dsi.score_description,dsi.score_value,dsi.score_reference,dsi.score_calculation_method," +
+				"dsi.department_id,d.department_name,d.higher_department_id,dsi.score_category_id,sc.score_category_name," +
+				"dsi.score_creation_date,dsi.score_in_use " +
+				"from department_score_item dsi,department d,score_category sc " +
+				"where dsi.department_id=d.department_id " +
+				"and dsi.score_category_id=sc.score_category_id " +
+				"and dsi.score_in_use=1 "+
+				"and dsi.score_item_id=?;";
+		
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, itemId);
+			
+			resultSet=preparedStatement.executeQuery();
+			while(resultSet.next()){
+				departmentScoreItem.setDepartment(new Department(resultSet.getInt("dsi.department_id"),resultSet.getString("d.department_name"),resultSet.getInt("d.higher_department_id")));
+				departmentScoreItem.setDepartmentScoredItemId(resultSet.getInt("dsi.score_item_id"));
+				departmentScoreItem.setDepartmentScoreName(resultSet.getString("d.department_name"));
+				departmentScoreItem.setScoreCalculationMethod(resultSet.getString("dsi.score_calculation_method"));
+				departmentScoreItem.setScoreDate(resultSet.getDate("dsi.score_creation_date"));
+				departmentScoreItem.setScoreDescription(resultSet.getString("dsi.score_description"));
+				departmentScoreItem.setScoreInUse(resultSet.getInt("dsi.score_in_use"));
+				departmentScoreItem.setScoreItemCategory(
+						new ScoreItemCategory(resultSet.getInt("dsi.score_category_id"),resultSet.getString("sc.score_category_name")));
+				departmentScoreItem.setScoreReference(resultSet.getString("dsi.score_reference"));
+				departmentScoreItem.setScoreValue(resultSet.getFloat("dsi.score_value"));
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		
+		return departmentScoreItem;
+	}
+	
+	*/
+	//填写重点工作修改次数
+	public void insertModifyKeyWorkScoreTimes(int times,int fDepId,int tDepId,String category)throws Exception{
+		String sql="insert into department_score_Revocation(department_from_id,department_to_id,score_category,remaining_times) values(?,?,?,?);";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1,fDepId);
+			preparedStatement.setInt(2,tDepId);
+			preparedStatement.setString(3, category);
+			preparedStatement.setInt(4, times);
+			
+			preparedStatement.executeUpdate();
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(preparedStatement, connection);
+		}
+	}
+	
+
+//=========================================================以下向重点工作"得分修改"提供数据====================================================================
+	/**
+	 * 为服务层提供已经打分的部门信息，这些不止是当前的，还有以前的
+	 */
+	public List<Department> getBeScoredDepartments(List<Date> dateList)throws Exception{
+		List<Department> beScoredDepartments=null;
+		String sql="select d.department_id,d.department_name,d.higher_department_id,dsr.score_date " +
+				"from department_score_record dsr,department d " +
+				"where dsr.department_to_id=d.department_id " +
+				"and score_item_id in(" +
+				"select dsi.score_item_id " +
+				"from department_score_item dsi,score_category sc " +
+				"where dsi.score_category_id=sc.score_category_id " +
+				"and sc.score_category_name='重点工作'" +
+				");";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			beScoredDepartments=new ArrayList<Department>();
+			resultSet=preparedStatement.executeQuery();
+			while(resultSet.next()){
+				Department department=new Department(resultSet.getInt("d.department_id"),
+						resultSet.getString("d.department_name"),resultSet.getInt("higher_department_id"));
+				Date date=resultSet.getDate("dsr.score_date");
+				beScoredDepartments.add(department);
+				dateList.add(date);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return beScoredDepartments;
+	}
+	/**
+	 * 提供现阶段 “绩效考评”中 “重点工作”已经被打分的部门
+	 * @param startTime
+	 * @param endTime
+	 * @return
+	 * @throws Exception
+	 */
+	public List<Department> getkeyWorkNowBeScoredDepartmentsModify(int year, int month)throws Exception{
+		List<Department> departmentList=new ArrayList<Department>();
+		String sql="select d.department_id,d.department_name,d.higher_department_id " +
+		"from department_score_record dsr,department d " +
+		"where dsr.department_to_id=d.department_id " +
+		"and dsr.which_year = ? and dsr.which_month=? "+
+		"and dsr.score_item_id in(" +
+		"select dsi.score_item_id " +
+		"from department_score_item dsi,score_category sc " +
+		"where dsi.score_category_id=sc.score_category_id " +
+		"and sc.score_category_id=3" +
+		");";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, year);
+			preparedStatement.setInt(2, month);
+			resultSet=preparedStatement.executeQuery();
+			while(resultSet.next()){
+				Department department=new Department(resultSet.getInt("d.department_id"),
+						resultSet.getString("d.department_name"),resultSet.getInt("higher_department_id"));
+				departmentList.add(department);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return departmentList;
+	}
+	
+	/**
+	 * 根据所选部门名称，查出相应的重点工作条目
+	 * @param departmentName
+	 * @param dateList
+	 * @param itemScoreList
+	 * @return
+	 * @throws Exception
+	 */
+	public List<DepartmentScoreItem> getDepartmentWorkBeScoredItem(String departmentName,List<Date> dateList,List<Float> itemScoreList)throws Exception{
+		List<DepartmentScoreItem> departmentScoreItemList=null;
+		String sql="select dsi.score_item_id,dsi.score_description,dsi.score_value,dsi.score_reference,dsi.department_id,d.department_name," +
+				"d.higher_department_id,dsi.score_category_id,sc.score_category_name,dsr.score_date,dsr.score " +
+				"from department d,department_score_item dsi,score_category sc,department_score_record dsr " +
+				"where d.department_id=dsi.department_id and dsi.score_category_id=sc.score_category_id " +
+				"and dsi.score_item_id=dsr.score_item_id and d.department_name=? " +
+				"and sc.score_category_name='重点工作';";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setString(1, departmentName);
+			departmentScoreItemList=new ArrayList<DepartmentScoreItem>();
+			
+			resultSet=preparedStatement.executeQuery();
+			while(resultSet.next()){
+				DepartmentScoreItem departmentScoreItem=new DepartmentScoreItem();
+				departmentScoreItem.setDepartmentScoredItemId(resultSet.getInt("dsi.score_item_id"));
+				departmentScoreItem.setDepartmentScoreName("");
+				departmentScoreItem.setScoreDescription(resultSet.getString("dsi.score_description"));
+				departmentScoreItem.setScoreValue(resultSet.getFloat("dsi.score_value"));
+				departmentScoreItem.setScoreReference(resultSet.getString("dsi.score_reference"));
+				departmentScoreItem.setScoreCalculationMethod("");
+				departmentScoreItem.setDepartment(new Department(resultSet.getInt("dsi.department_id"),resultSet.getString("d.department_name"),resultSet.getInt("d.higher_department_id")));
+				departmentScoreItem.setScoreItemCategory(new ScoreItemCategory(resultSet.getInt("dsi.score_category_id"),resultSet.getString("sc.score_category_name")));
+				
+				departmentScoreItemList.add(departmentScoreItem);
+				
+				dateList.add(resultSet.getDate("dsr.score_date"));
+				
+				itemScoreList.add(resultSet.getFloat("dsr.score"));
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return departmentScoreItemList;
+	}
+	/**
+	 * 根据所选部门名称，查出相应的重点工作条目
+	 * @param departmentName
+	 * @param dateList
+	 * @param itemScoreList
+	 * @return
+	 * @throws Exception
+	 */
+	public List<DepartmentScoreItem> getDepartmentWorkBeScoredItem(String departmentName,List<Date> dateList,List<Float> itemScoreList,long startTime,long endTime)throws Exception{
+		List<DepartmentScoreItem> departmentScoreItemList=null;
+		String sql="select dsi.score_item_id,dsi.score_description,dsi.score_value,dsi.score_reference,dsi.department_id,d.department_name," +
+				"d.higher_department_id,dsi.score_category_id,sc.score_category_name,dsr.score_date,dsr.score " +
+				"from department d,department_score_item dsi,score_category sc,department_score_record dsr " +
+				"where d.department_id=dsi.department_id and dsi.score_category_id=sc.score_category_id " +
+				"and dsi.score_item_id=dsr.score_item_id and d.department_name=? " +
+				"and unix_timestamp(dsr.score_date) between ? and ? "+
+				"and sc.score_category_name='重点工作';";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setString(1, departmentName);
+			preparedStatement.setLong(2,startTime);
+			preparedStatement.setLong(3, endTime);
+			departmentScoreItemList=new ArrayList<DepartmentScoreItem>();
+			
+			resultSet=preparedStatement.executeQuery();
+			while(resultSet.next()){
+				DepartmentScoreItem departmentScoreItem=new DepartmentScoreItem();
+				departmentScoreItem.setDepartmentScoredItemId(resultSet.getInt("dsi.score_item_id"));
+				departmentScoreItem.setDepartmentScoreName("");
+				departmentScoreItem.setScoreDescription(resultSet.getString("dsi.score_description"));
+				departmentScoreItem.setScoreValue(resultSet.getFloat("dsi.score_value"));
+				departmentScoreItem.setScoreReference(resultSet.getString("dsi.score_reference"));
+				departmentScoreItem.setScoreCalculationMethod("");
+				departmentScoreItem.setDepartment(new Department(resultSet.getInt("dsi.department_id"),resultSet.getString("d.department_name"),resultSet.getInt("d.higher_department_id")));
+				departmentScoreItem.setScoreItemCategory(new ScoreItemCategory(resultSet.getInt("dsi.score_category_id"),resultSet.getString("sc.score_category_name")));
+				
+				departmentScoreItemList.add(departmentScoreItem);
+				
+				dateList.add(resultSet.getDate("dsr.score_date"));
+				
+				itemScoreList.add(resultSet.getFloat("dsr.score"));
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return departmentScoreItemList;
+	} 
+//--------------------------------------------------------------------------------------------------------
+	/**
+	 * 根据所选部门名称，查出相应的重点工作条目	的改进方法
+	 * 	从sql语句上规避时间问题，
+	 * 	从创建CompleteDepartmentScoreItem类，规避分数无法存储问题
+	 */
+	public List<CompleteDepartmentScoreItem> getDepartmentWorkBeScoredItem(int departmentId,int year, int month)throws Exception{
+		List<CompleteDepartmentScoreItem> completeDepartmentScoreItems=null;
+		String sql="select dsi.score_item_id,dsi.score_description,dsi.score_value,dsi.score_reference,dsi.department_id,d.department_name," +
+		"d.higher_department_id,dsi.score_category_id,sc.score_category_name,dsr.score_date,dsr.score, dsr.modify_times " +
+		"from department d,department_score_item dsi,score_category sc,department_score_record dsr " +
+		"where d.department_id=dsi.department_id and dsi.score_category_id=sc.score_category_id " +
+		"and dsi.score_item_id=dsr.score_item_id and d.department_id=? " +
+		"and dsr.which_year = ? and dsr.which_month = ? "+
+		"and sc.score_category_id=3;";
+		
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, departmentId);
+			preparedStatement.setInt(2, year);
+			preparedStatement.setInt(3, month);
+			
+			completeDepartmentScoreItems=new ArrayList<CompleteDepartmentScoreItem>();
+			
+			resultSet=preparedStatement.executeQuery();
+			while(resultSet.next()){
+				DepartmentScoreItem departmentScoreItem=new DepartmentScoreItem();
+				departmentScoreItem.setDepartmentScoredItemId(resultSet.getInt("dsi.score_item_id"));
+				departmentScoreItem.setDepartmentScoreName("");
+				departmentScoreItem.setScoreDescription(resultSet.getString("dsi.score_description"));
+				departmentScoreItem.setScoreValue(resultSet.getFloat("dsi.score_value"));
+				departmentScoreItem.setScoreReference(resultSet.getString("dsi.score_reference"));
+				departmentScoreItem.setScoreCalculationMethod("");
+				departmentScoreItem.setDepartment(new Department(resultSet.getInt("dsi.department_id"),resultSet.getString("d.department_name"),resultSet.getInt("d.higher_department_id")));
+				departmentScoreItem.setScoreItemCategory(new ScoreItemCategory(resultSet.getInt("dsi.score_category_id"),resultSet.getString("sc.score_category_name")));
+				
+				float score=resultSet.getFloat("dsr.score");
+				int modifytimes = resultSet.getInt("dsr.modify_times");
+				
+				CompleteDepartmentScoreItem completeDepartmentScoreItem=new CompleteDepartmentScoreItem();
+				completeDepartmentScoreItem.setDepartmentScoreItem(departmentScoreItem);
+				completeDepartmentScoreItem.setScore(score);
+				completeDepartmentScoreItem.setModifyTimes(modifytimes);
+				
+				completeDepartmentScoreItems.add(completeDepartmentScoreItem);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return completeDepartmentScoreItems;
+	}
+//--------------------------------------------------------------------------------------------------------------------
+	/**
+	 * 修改评分记录中的分数
+	 * 		
+	 * 	注意：unix_timestamp(Date date) 是mysql中返回unix时间戳的方法，单位是 秒
+	 * 	               而java中date.getTime()方法，的返回值的单位是毫秒
+	 * 		    为了能够将两者相互比较，则应该换算一下
+	 * @param scoreItemId
+	 * @param time		换算之后的时间 long
+	 * @param score
+	 * @return
+	 * @throws Exception
+	 */
+	public boolean modifyDepartmentWorkScoreRecord(int scoreItemId,long time,float score)throws Exception{
+		boolean isSuccess=false;
+		String sql="update department_score_record set modify_times = modify_times-1, score=? where score_item_id=? and unix_timestamp(score_date)>=?";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setFloat(1, score);
+			preparedStatement.setInt(2, scoreItemId);
+			preparedStatement.setLong(3, time);
+			
+			preparedStatement.execute();
+			isSuccess=true;
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(preparedStatement, connection);
+		}
+		
+		return isSuccess;
+	}
+	
+	/**
+	 * 修改评分记录中的分数
+	 * 		
+	 * 	注意：unix_timestamp(Date date) 是mysql中返回unix时间戳的方法，单位是 秒
+	 * 	               而java中date.getTime()方法，的返回值的单位是毫秒
+	 * 		    为了能够将两者相互比较，则应该换算一下
+	 * @param scoreItemId
+	 * @param time		换算之后的时间 long
+	 * @param score
+	 * @return
+	 * @throws Exception
+	 */
+	public boolean modifyDepartmentWorkScoreRecord(int scoreItemId,long startTime,long endTime,float score)throws Exception{
+		boolean isSuccess=false;
+		String sql="update department_score_record set score=? ,modify_times = modify_times-1where score_item_id=? and unix_timestamp(score_date) between ? and ?";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setFloat(1, score);
+			preparedStatement.setInt(2, scoreItemId);
+			preparedStatement.setLong(3, startTime);
+			preparedStatement.setLong(4, endTime);
+			
+			preparedStatement.execute();
+			isSuccess=true;
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(preparedStatement, connection);
+		}
+		
+		return isSuccess;
+	}
+	//------------------------------------------------------------------------------------------
+	/**
+	 * 修改评分记录中的分数
+	 * 		改进
+	 * 		对于重点工作的得分修改，加上了打分部门的条件，使得查找更具唯一性，而不是依赖于条目本身的唯一
+	 * @param scoreItemId
+	 * @param time		换算之后的时间 long
+	 * @param score
+	 * @return
+	 * @throws Exception
+	 */
+	public boolean modifyDepartmentWorkScoreRecord(Staff staff,int scoreItemId,int year, int month,float score)throws Exception{
+		boolean isSuccess=false;
+		String sql="update department_score_record set score=?, department_from_id=?, score_date=?, modify_times = modify_times-1 " +
+				" where score_item_id=? and which_year=? and which_month=?;";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setFloat(1, score);
+			preparedStatement.setInt(2, staff.getDepartment().getDepartmentId());
+			preparedStatement.setDate(3, new Date(System.currentTimeMillis()));
+			preparedStatement.setInt(4, scoreItemId);
+			preparedStatement.setInt(5, year);
+			preparedStatement.setInt(6, month);
+			
+			preparedStatement.execute();
+			isSuccess=true;
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(preparedStatement, connection);
+		}
+		
+		return isSuccess;
+	}
+	//------------------------------------------------------------------------------------------
+	
+//========================================================以下向市公司“部门得分”提供数据=======================================================================
+	
+	/**
+	 * 从数据库中获取 市公司各部门 以及 各区营业部的Department 对象集合
+	 */
+	public List<Department> getDepartmentScoreALLList()throws Exception{
+		List<Department> departmentList=new ArrayList<Department>();
+		String sql="select d.department_id,d.department_name,d.higher_department_id " +
+				"from department d " +
+				"where d.department_id in(" +
+											"select department_to_id " +
+											"from department_score_record " +
+											"group by department_to_id" +
+										");";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			resultSet=preparedStatement.executeQuery();
+			
+			while(resultSet.next()){
+				Department deparment=new Department(resultSet.getInt("d.department_id"),resultSet.getString("d.department_name"),resultSet.getInt("d.higher_department_id"));
+				departmentList.add(deparment);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return departmentList;
+	}
+	
+	/**
+	 * 根据部门对象department，找出所对应的评分细则对象
+	 * @param department
+	 * @return
+	 * @throws Exception
+	 */
+	public List<DepartmentScoreItem> getDepartmentScoreItemList(Department department)throws Exception{
+		List<DepartmentScoreItem> departmentScoreItems=new ArrayList<DepartmentScoreItem>();
+		String sql="select score_item_id,score_item_name,score_description,score_value,score_reference,score_calculation_method," +
+				"dsi.score_category_id,sc.score_category_name,score_creation_date,score_in_use " +
+				"from department_score_item dsi,score_category sc " +
+				"where dsi.score_category_id=sc.score_category_id " +
+				"and department_id=? " +
+				"and score_in_use=1";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection = DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, department.getDepartmentId());
+			resultSet=preparedStatement.executeQuery();
+			while(resultSet.next()){
+				DepartmentScoreItem departmentScoreItem=new DepartmentScoreItem(resultSet.getInt("score_item_id"),resultSet.getString("score_item_name"),
+						resultSet.getString("score_description"),resultSet.getFloat("score_value"),resultSet.getString("score_reference"),
+						resultSet.getString("score_calculation_method"),department,new ScoreItemCategory(resultSet.getInt("dsi.score_category_id"),resultSet.getString("sc.score_category_name")),
+						resultSet.getDate("score_creation_date"),resultSet.getInt("score_in_use"));
+				departmentScoreItems.add(departmentScoreItem);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return departmentScoreItems;
+	}
+	/**
+	 * 根据评分细则，找到对应的所有打分记录
+	 * @param departmentScoreItem
+	 * @return
+	 * @throws Exception
+	 */
+	public List<DepartmentScoreRecord> getDepartmentScoreRecords(DepartmentScoreItem departmentScoreItem,long time)throws Exception{
+		List<DepartmentScoreRecord> departmentScoreRecords=new ArrayList<DepartmentScoreRecord>();
+		String sql="select dsr.department_score_record_id,dsr.score,dsr.score_comment,dsr.score_date,dsr.which_year,dsr.which_month,dsr.modify_times," +
+				"fd.department_id,fd.department_name,fd.higher_department_id,td.department_id,td.department_name,td.higher_department_id " +
+				"from department_score_record dsr,department fd,department td " +
+				"where dsr.department_from_id=fd.department_id and dsr.department_to_id=td.department_id and dsr.score_item_id=? " +
+				"and unix_timestamp(score_date)>=?;";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, departmentScoreItem.getDepartmentScoredItemId());
+			preparedStatement.setLong(2, time);
+			resultSet=preparedStatement.executeQuery();
+			
+			while(resultSet.next()){
+				DepartmentScoreRecord departmentScoreRecord=new DepartmentScoreRecord(resultSet.getInt("dsr.department_score_record_id"),
+						new Department(resultSet.getInt("fd.department_id"),resultSet.getString("fd.department_name"),resultSet.getInt("fd.higher_department_id")),
+						new Department(resultSet.getInt("td.department_id"),resultSet.getString("td.department_name"),resultSet.getInt("td.higher_department_id")),
+						departmentScoreItem,
+						resultSet.getFloat("dsr.score"),
+						resultSet.getString("dsr.score_comment"),
+						resultSet.getDate("dsr.score_date"),
+						resultSet.getInt("dsr.which_year"),
+						resultSet.getInt("dsr.which_month"),
+						resultSet.getInt("modify_times")
+				);
+				departmentScoreRecords.add(departmentScoreRecord);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return departmentScoreRecords;
+	}
+	/**
+	 * 根据评分细则，找到对应的所有打分记录
+	 * @param departmentScoreItem
+	 * @return
+	 * @throws Exception
+	 */
+	public List<DepartmentScoreRecord> getDepartmentScoreRecords(DepartmentScoreItem departmentScoreItem,long startTime,long endTime)throws Exception{
+		List<DepartmentScoreRecord> departmentScoreRecords=new ArrayList<DepartmentScoreRecord>();
+		String sql="select dsr.department_score_record_id,dsr.score,dsr.score_comment,dsr.score_date,dsr.which_year,dsr.which_month,dsr.modify_times," +
+				"fd.department_id,fd.department_name,fd.higher_department_id,td.department_id,td.department_name,td.higher_department_id " +
+				"from department_score_record dsr,department fd,department td " +
+				"where dsr.department_from_id=fd.department_id and dsr.department_to_id=td.department_id and dsr.score_item_id=? " +
+				"and unix_timestamp(score_date) between ? and ?;";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, departmentScoreItem.getDepartmentScoredItemId());
+			preparedStatement.setLong(2, startTime);
+			preparedStatement.setLong(3, endTime);
+			resultSet=preparedStatement.executeQuery();
+			
+			while(resultSet.next()){
+				DepartmentScoreRecord departmentScoreRecord=new DepartmentScoreRecord(resultSet.getInt("dsr.department_score_record_id"),
+						new Department(resultSet.getInt("fd.department_id"),resultSet.getString("fd.department_name"),resultSet.getInt("fd.higher_department_id")),
+						new Department(resultSet.getInt("td.department_id"),resultSet.getString("td.department_name"),resultSet.getInt("td.higher_department_id")),
+						departmentScoreItem,
+						resultSet.getFloat("dsr.score"),
+						resultSet.getString("dsr.score_comment"),
+						resultSet.getDate("dsr.score_date"),
+						resultSet.getInt("dsr.which_year"),
+						resultSet.getInt("dsr.which_month"),
+						resultSet.getInt("modify_times")
+				);
+				departmentScoreRecords.add(departmentScoreRecord);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return departmentScoreRecords;
+	}
+	/**
+	 * 当经过部门得分算法之后，将部门得分的结果插入到部门得分表中
+	 * @param department
+	 * @param score
+	 * @param year
+	 * @param month
+	 * @return
+	 * @throws Exception
+	 */
+	public boolean insertDepartmentScore(Department department,float score,int year,int month,String explain)throws Exception{
+		String sql="insert into department_score(department_id,total_score,which_year,which_month,annotation) values(?,?,?,?,?);";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, department.getDepartmentId());
+			preparedStatement.setFloat(2, score);
+			preparedStatement.setInt(3, year);
+			preparedStatement.setInt(4, month);
+			preparedStatement.setString(5, explain);
+			preparedStatement.executeUpdate();
+			return true;
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(preparedStatement, connection);
+		}
+		return false;
+	}
+	
+//----------------------------------------------------------------------------------------------------------------------------------------------
+	/**
+	 * 根据所选部门名称查找出该部门的总得分
+	 */
+	public DepartmentScore selectDepartmentScore(Department department,int year,int month)throws Exception{
+		DepartmentScore departmentScore=null;
+		String sql="select d.department_id,d.department_name,d.higher_department_id,ds.total_score " +
+				"from department_score ds,department d " +
+				"where ds.department_id=d.department_id and d.department_id=? and which_year=? and which_month=?";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, department.getDepartmentId());
+			preparedStatement.setInt(2, year);
+			preparedStatement.setInt(3, month);
+			resultSet=preparedStatement.executeQuery();
+			if(resultSet.next()){
+				departmentScore=new DepartmentScore(new Department(resultSet.getInt("d.department_id"),resultSet.getString("d.department_name"),resultSet.getInt("d.higher_department_id")),
+						resultSet.getFloat("ds.total_score"));
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return departmentScore;
+	}
+	
+	/**
+	 * 根据部门，查找出该部门能够打分的可用评分细则
+	 */
+	public List<DepartmentScoreItem> getShouldScoredItem(Department department)throws Exception{
+		List<DepartmentScoreItem> departmentScoreItemList=null;
+		String sql="select dsi.score_item_id,dsi.score_item_name,dsi.score_description,dsi.score_value," +
+				"dsi.score_reference,dsi.score_calculation_method,td.department_id,td.department_name,td.higher_department_id," +
+				"sc.score_category_id,sc.score_category_name,dsi.score_creation_date,dsi.score_in_use " +
+				"from department_score_item dsi,department_score_relation dsr,department fd,score_category sc,department td " +
+				"where dsi.score_item_id=dsr.score_item_id and dsr.department_id=fd.department_id " +
+				"and dsi.department_id=td.department_id and dsi.score_category_id=sc.score_category_id " +
+				"and fd.department_id=? and dsi.score_in_use=1;";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, department.getDepartmentId());
+			
+			resultSet=preparedStatement.executeQuery();
+			departmentScoreItemList=new ArrayList<DepartmentScoreItem>();
+			while(resultSet.next()){
+				DepartmentScoreItem departmentScoreItem=new DepartmentScoreItem(resultSet.getInt("dsi.score_item_id"), 
+						resultSet.getString("dsi.score_item_name"), resultSet.getString("dsi.score_description"), 
+						resultSet.getFloat("dsi.score_value"), resultSet.getString("dsi.score_reference"), 
+						resultSet.getString("dsi.score_calculation_method"), 
+						new Department(resultSet.getInt("td.department_id"),resultSet.getString("td.department_name"),resultSet.getInt("td.higher_department_id")), 
+						new ScoreItemCategory(resultSet.getInt("sc.score_category_id"),resultSet.getString("sc.score_category_name")), 
+						resultSet.getDate("dsi.score_creation_date"), resultSet.getInt("dsi.score_in_use"));
+				
+				departmentScoreItemList.add(departmentScoreItem);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return departmentScoreItemList;
+	}
+	
+	/**
+	 * 找出所有参与部门互评的部门
+	 * @return
+	 
+	public List<Department> getAllDepartmentScoreDepartment()throws Exception{
+		List<Department> departmentList=new ArrayList<Department>();
+		/*String sql="select d.department_id,d.department_name,d.higher_department_id " +
+				"from staff s,department d,post p " +
+				"where s.department_id=d.department_id and s.post_id=p.post_id " +
+				"and p.post_name in ('市公司部门主任','区营业部经理','副总经理')";
+		// 查找方法由 “根据员工职位查找” 改变为 “根据角色权限” 来查找，使代码更加灵活，是一个突破性的改变
+		String sql="select d.department_id,d.department_name,d.higher_department_id " +
+				"from staff s,department d,role r,funcpage f,role_funcpage_relation rfr " +
+				"where s.department_id=d.dep	artment_id " +
+				"and s.role_id=r.role_id " +
+				"and r.role_id=rfr.role_id " +
+				"and rfr.funcpage_id=f.funcpage_id " +
+				"and f.funcpage_name='部门打分';";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			resultSet=preparedStatement.executeQuery();
+			
+			while(resultSet.next()){
+				Department deparment=new Department(resultSet.getInt("d.department_id"),resultSet.getString("d.department_name"),resultSet.getInt("d.higher_department_id"));
+				departmentList.add(deparment);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return departmentList;
+	}
+*/
+
+	/**
+	 * 找到最近，该部门，针对该条目的评分记录
+	 */
+	public DepartmentScoreRecord getDepartmentScoreRecord(Department fDepartment,DepartmentScoreItem departmentScoreItem,long time)throws Exception{
+		DepartmentScoreRecord departmentScoreRecord=null;
+		String sql="select dsr.department_score_record_id,dsr.score_comment,dsr.score,dsr.score_date,dsr.which_year,dsr.which_month,dsr.modify_times, " +
+		"fd.department_id,fd.department_name,fd.higher_department_id,td.department_id,td.department_name,td.higher_department_id " +
+		"from department_score_record dsr,department fd,department td " +
+		"where dsr.department_from_id=fd.department_id and dsr.department_to_id=td.department_id " +
+		"and department_from_id=? "+
+		"and score_item_id=? " +
+		"and unix_timestamp(score_date)>=?;";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, fDepartment.getDepartmentId());
+			preparedStatement.setInt(2, departmentScoreItem.getDepartmentScoredItemId());
+			preparedStatement.setLong(3, time);
+			resultSet=preparedStatement.executeQuery();
+			
+			if(resultSet.next()){
+				departmentScoreRecord=new DepartmentScoreRecord(resultSet.getInt("dsr.department_score_record_id"),
+						new Department(resultSet.getInt("fd.department_id"),resultSet.getString("fd.department_name"),resultSet.getInt("fd.higher_department_id")),
+						new Department(resultSet.getInt("td.department_id"),resultSet.getString("td.department_name"),resultSet.getInt("td.higher_department_id")),
+						departmentScoreItem,
+						resultSet.getFloat("dsr.score"),
+						resultSet.getString("dsr.score_comment"),
+						resultSet.getDate("dsr.score_date"),
+						resultSet.getInt("dsr.which_year"),
+						resultSet.getInt("dsr.which_month"),
+						resultSet.getInt("dsr.modify_times")
+				);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return departmentScoreRecord;
+	}
+	
+	/**
+	 * 找到最近，该部门，针对该条目的评分记录
+	 */
+	public DepartmentScoreRecord getDepartmentScoreRecord(Department fDepartment,DepartmentScoreItem departmentScoreItem,long startTime,long endTime)throws Exception{
+		DepartmentScoreRecord departmentScoreRecord=null;
+		String sql="select dsr.department_score_record_id,dsr.score,dsr.score_comment,dsr.score_date,dsr.which_year,dsr.which_month,dsr.modify_times, " +
+		"fd.department_id,fd.department_name,fd.higher_department_id,td.department_id,td.department_name,td.higher_department_id " +
+		"from department_score_record dsr,department fd,department td " +
+		"where dsr.department_from_id=fd.department_id and dsr.department_to_id=td.department_id " +
+		"and department_from_id=? "+
+		"and score_item_id=? " +
+		"and unix_timestamp(score_date) between ? and ?;";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, fDepartment.getDepartmentId());
+			preparedStatement.setInt(2, departmentScoreItem.getDepartmentScoredItemId());
+			preparedStatement.setLong(3, startTime);
+			preparedStatement.setLong(4, endTime);
+			resultSet=preparedStatement.executeQuery();
+			
+			if(resultSet.next()){
+				departmentScoreRecord=new DepartmentScoreRecord(resultSet.getInt("dsr.department_score_record_id"),
+						new Department(resultSet.getInt("fd.department_id"),resultSet.getString("fd.department_name"),resultSet.getInt("fd.higher_department_id")),
+						new Department(resultSet.getInt("td.department_id"),resultSet.getString("td.department_name"),resultSet.getInt("td.higher_department_id")),
+						departmentScoreItem,
+						resultSet.getFloat("dsr.score"),
+						resultSet.getString("dsr.score_comment"),
+						resultSet.getDate("dsr.score_date"),
+						resultSet.getInt("dsr.which_year"),
+						resultSet.getInt("dsr.which_month"),
+						resultSet.getInt("dsr.modify_times")
+				);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return departmentScoreRecord;
+	}
+	
+//================================================================以下向“员工得分”提供数据======================================================================
+	/**
+	 * 获得拥有“员工打分”权限的员工列表
+	 
+	public List<Staff> getOwnScorePermissionsStaffs()throws Exception{
+		List<Staff> staffList=new ArrayList<Staff>();
+		String sql1="select s.staff_id,s.staff_name,s.staff_no,s.staff_sex,s.staff_password,s.department_id,d.department_name,d.higher_department_id," +
+				"s.role_id,r.role_name,r.role_description,s.post_id,p.post_name " +
+				"from staff s,role r,role_funcpage_relation rfr,funcpage f,department d,post p " +
+				"where s.role_id=r.role_id and r.role_id=rfr.role_id " +
+				"and rfr.funcpage_id=f.funcpage_id and s.department_id=d.department_id " +
+				"and s.post_id=p.post_id and f.funcpage_name='员工打分';";
+		String sql="select s.staff_id,s.staff_name,s.staff_no,s.staff_sex,s.staff_password,s.department_id,d.department_name,d.higher_department_id,s.role_id,r.role_name,r.role_description,s.post_id,p.post_name " +
+				"from staff s,role r,department d,post p where s.role_id=r.role_id and s.post_id=p.post_id and s.department_id=d.department_id and p.post_id in(2,3,4,7,8,9)";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			resultSet=preparedStatement.executeQuery();
+			
+			while(resultSet.next()){
+				Staff staff=new Staff(resultSet.getInt("s.staff_id"),resultSet.getString("s.staff_name"),resultSet.getInt("s.staff_no"),resultSet.getString("s.staff_sex"),resultSet.getString("s.staff_password"),
+						new Department(resultSet.getInt("s.department_id"),resultSet.getString("d.department_name"),resultSet.getInt("d.higher_department_id")),
+						new Post(resultSet.getInt("s.post_id"),resultSet.getString("p.post_name")),
+						new Role(resultSet.getInt("s.role_id"),resultSet.getString("r.role_name"),resultSet.getString("r.role_description")));
+				staffList.add(staff);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return staffList;
+	}
+	*/
+	
+	
+	/**
+	 * 获取区营业部经理或分公司经理的“员工打分”的对象
+	 * 			即：所属“科长”
+	 * @param staffManager		营业部或分公司经理staff对象
+	 * @return
+	 * @throws Exception
+	 */
+	public List<Staff> getBusinessManagerScoreObject(Staff staffManager)throws Exception{
+		List<Staff> staffList=new ArrayList<Staff>();
+		String sql="select s.staff_id,s.staff_name,s.staff_no,s.staff_sex,s.staff_password,s.department_id,d.department_name,d.higher_department_id," +
+				"s.post_id,p.post_name,s.role_id,r.role_name,r.role_description " +
+				"from staff s,department d,post p,role r " +
+				"where s.department_id=d.department_id and s.post_id=p.post_id and s.role_id=r.role_id " +
+				"and p.post_name in ('区营业部科室科长','区营业部乡镇站站长') " +
+				"and s.department_id in (select department_id from department where higher_department_id=?);";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, staffManager.getDepartment().getDepartmentId());
+			resultSet=preparedStatement.executeQuery();
+	
+			while(resultSet.next()){
+				Staff staff=new Staff(resultSet.getInt("s.staff_id"),resultSet.getString("s.staff_name"),resultSet.getInt("staff_no"),resultSet.getString("s.staff_sex"),resultSet.getString("s.staff_password"),
+				new Department(resultSet.getInt("s.department_id"),resultSet.getString("d.department_name"),resultSet.getInt("d.higher_department_id")),
+				new Post(resultSet.getInt("s.post_id"),resultSet.getString("p.post_name")),
+				new Role(resultSet.getInt("s.role_id"),resultSet.getString("r.role_name"),resultSet.getString("r.role_description")));
+				staffList.add(staff);
+			}
+		}catch(Exception e){
+			e.printStackTrace(); 
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return staffList;
+	}
+	
+	
+	
+	/**
+	 * 获取区     非    营业部经理或分公司经理的“员工打分”的对象
+	 * 		即 部门经理  或者是 科长  或者是站长
+	 * @param noStaffManager   部门经理 科长 站长
+	 * @return
+	 * @throws Exception
+	 */
+	public List<Staff> getNoBusinessManagerScoreObjec(Staff noStaffManager)throws Exception{
+		List<Staff> staffList=new ArrayList<Staff>();
+		String sql="select s.staff_id,s.staff_name,s.staff_no,s.staff_password,s.staff_sex,s.department_id,d.department_name,d.department_name,d.higher_department_id," +
+				"s.role_id,r.role_name,r.role_description,s.post_id,p.post_name " +
+				"from staff s,department d,post p,role r " +
+				"where s.department_id=d.department_id and s.role_id=r.role_id and s.post_id=p.post_id " +
+				"and s.department_id=? " +
+				"and s.staff_id<>?;";           
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, noStaffManager.getDepartment().getDepartmentId());
+			preparedStatement.setInt(2, noStaffManager.getStaffId());
+			resultSet=preparedStatement.executeQuery();
+	
+			while(resultSet.next()){
+				Staff staff=new Staff(resultSet.getInt("s.staff_id"),
+						resultSet.getString("s.staff_name"),
+						resultSet.getInt("s.staff_no"),
+						resultSet.getString("s.staff_sex"),
+						resultSet.getString("s.staff_password"),
+				new Department(resultSet.getInt("s.department_id"),resultSet.getString("d.department_name"),resultSet.getInt("d.higher_department_id")),
+				new Post(resultSet.getInt("s.post_id"),resultSet.getString("p.post_name")),
+				new Role(resultSet.getInt("s.role_id"),resultSet.getString("r.role_name"),resultSet.getString("r.role_description"))
+				 );
+				staffList.add(staff);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return staffList;
+	}
+	public List<Staff> getDeputyDirectorOrDeputyChiefScoreObject(Staff noStaffManager)throws Exception{
+		List<Staff> staffList=new ArrayList<Staff>();
+		String sql="select s.staff_id,s.staff_name,s.staff_no,s.staff_password,s.staff_sex,s.department_id,d.department_name,d.department_name,d.higher_department_id," +
+				"s.role_id,r.role_name,r.role_description,s.post_id,p.post_name " +
+				"from staff s,department d,post p,role r " +
+				"where s.department_id=d.department_id and s.role_id=r.role_id and s.post_id=p.post_id " +
+				"and s.department_id=? " +
+				"and p.post_name not in('市公司部门主任','市公司部门副主任','区营业部科室科长','区营业部科室副科长');";           
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, noStaffManager.getDepartment().getDepartmentId());
+			resultSet=preparedStatement.executeQuery();
+	
+			while(resultSet.next()){
+				Staff staff=new Staff(resultSet.getInt("s.staff_id"),resultSet.getString("s.staff_name"),resultSet.getInt("s.staff_no"),resultSet.getString("s.staff_sex"),resultSet.getString("s.staff_password"),
+				new Department(resultSet.getInt("s.department_id"),resultSet.getString("d.department_name"),resultSet.getInt("d.higher_department_id")),
+				new Post(resultSet.getInt("s.post_id"),resultSet.getString("p.post_name")),
+				new Role(resultSet.getInt("s.role_id"),resultSet.getString("r.role_name"),resultSet.getString("r.role_description")));
+				staffList.add(staff);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return staffList;
+	}
+	public List<Staff> getDeputyManagerOrSalesDeputyManagerScoreObject(Staff noStaffManager)throws Exception{
+		List<Staff> staffList=new ArrayList<Staff>();
+		String sql="select s.staff_id,s.staff_name,s.staff_no,s.staff_password,s.staff_sex,s.department_id,d.department_name,d.department_name,d.higher_department_id," +
+				"s.role_id,r.role_name,r.role_description,s.post_id,p.post_name " +
+				"from staff s,department d,post p,role r " +
+				"where s.department_id=d.department_id and s.role_id=r.role_id and s.post_id=p.post_id " +
+				"and d.higher_department_id=? " +
+				"and p.post_name in('市公司部门副主任','区营业部科室副科长');";           
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, noStaffManager.getDepartment().getDepartmentId());
+			resultSet=preparedStatement.executeQuery();
+	
+			while(resultSet.next()){
+				Staff staff=new Staff(resultSet.getInt("s.staff_id"),resultSet.getString("s.staff_name"),resultSet.getInt("s.staff_no"),resultSet.getString("s.staff_sex"),resultSet.getString("s.staff_password"),
+				new Department(resultSet.getInt("s.department_id"),resultSet.getString("d.department_name"),resultSet.getInt("d.higher_department_id")),
+				new Post(resultSet.getInt("s.post_id"),resultSet.getString("p.post_name")),
+				new Role(resultSet.getInt("s.role_id"),resultSet.getString("r.role_name"),resultSet.getString("r.role_description")));
+				staffList.add(staff);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return staffList;
+	}
+	/**
+	 * 获取 员工 当前 有评分记录的条目的总数
+	 * @param staff
+	 * @param time
+	 * @return
+	 * @throws Exception
+	 */
+	public int getStaffScoreRecordQuantity(Staff staff,long time)throws Exception{
+		int quantity=0;
+		String sql="select count(*) quantity " +
+				"from staff_score_record " +
+				"where scored_to_staff_id=? " +
+				"and unix_timestamp(score_date)>=?";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, staff.getStaffId());
+			preparedStatement.setLong(2, time);
+			resultSet=preparedStatement.executeQuery();
+			if(resultSet.next()){
+				quantity=resultSet.getInt("quantity");
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return quantity;
+	}
+	
+	/**
+	 * 获取 员工 当前 有评分记录的条目的总数
+	 * @param staff
+	 * @param time
+	 * @return
+	 * @throws Exception
+	 */
+	public int getStaffScoreRecordQuantity(Staff fStaff,Staff tStaff,int year, int month)throws Exception{
+		int quantity=0;
+		String sql="select count(*) quantity " +
+				"from staff_score_record " +
+				"where scored_to_staff_id=? and scored_from_staff_id=? " +
+				"and which_year=? and which_month=?;";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, tStaff.getStaffId());
+			preparedStatement.setInt(2, fStaff.getStaffId());
+			preparedStatement.setInt(3, year);
+			preparedStatement.setInt(4, month);
+			resultSet=preparedStatement.executeQuery();
+			if(resultSet.next()){
+				quantity=resultSet.getInt("quantity");
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return quantity;
+	}
+	
+	/**
+	 * 获得 员工的评分细则总数
+	 * @return
+	 * @throws Exception
+	 */
+	public int getStaffScoreItemQuantity(Staff staff)throws Exception{
+		int quantity=0;
+		String sql="select count(*) quantity from staff_score_item ssi,staff_score_relation ssr " +
+				"where ssi.score_item_id=ssr.score_item_id " +
+				"and ssr.department_id=? " +
+				"and ssr.post_id=? " +
+				"and ssi.score_in_use=1;";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, staff.getDepartment().getDepartmentId());
+			preparedStatement.setInt(2, staff.getPost().getPostId());
+			resultSet=preparedStatement.executeQuery();
+			if(resultSet.next()){
+				quantity=resultSet.getInt("quantity");
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return quantity;
+	}
+	
+//=============================================================以下为计算“员工得分”提供数据================================================================================
+	
+	/**
+	 * 在职位表中获取到所有职位
+	 */
+	public List<Post> getPostList()throws Exception{
+		List<Post> postList=new ArrayList<Post>();
+		String sql="select post_id,post_name from post;";
+		
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			
+			preparedStatement=connection.prepareStatement(sql);
+			
+			resultSet=preparedStatement.executeQuery();
+			
+			while(resultSet.next()){
+				Post post=new Post(resultSet.getInt("post_id"),resultSet.getString("post_name"));
+				postList.add(post);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return postList;
+	}
+	
+
+	
+	/**
+	 * 根据 分管副总对象 staff  找到下属部门的绩效分数
+	 */
+	public List<DepartmentScore> getDeputyMangerScore(Staff staff,int year,int month)throws Exception{
+		List<DepartmentScore> departmentScoreList=new ArrayList<DepartmentScore>();
+		String sql="select d.department_id,d.department_name,d.higher_department_id,ds.total_score,ds.annotation " +
+				"from department d,department_score ds " +
+				"where d.department_id=ds.department_id " +
+				"and ds.which_year=? and ds.which_month=? " +
+				"and ds.department_id in(select innd.department_id from department innd where innd.higher_department_id=?)";
+		
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, year);
+			preparedStatement.setInt(2, month);
+			preparedStatement.setInt(3, staff.getDepartment().getDepartmentId());
+			
+			resultSet=preparedStatement.executeQuery();
+			
+			while(resultSet.next()){
+				DepartmentScore departmentScore=new DepartmentScore(new Department(resultSet.getInt("d.department_id"),resultSet.getString("d.department_name"),resultSet.getInt("d.higher_department_id")),
+						resultSet.getFloat("ds.total_score"));
+				departmentScore.setInstruction(resultSet.getString("ds.annotation"));
+				departmentScoreList.add(departmentScore);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return departmentScoreList;
+	}
+	
+	/**
+	 * 根据市公司各部门主任或者各区营业部经理&副经理 staff   找到所属部门的得分
+	 * @param staff
+	 * @param year
+	 * @param month
+	 * @return
+	 * @throws Exception
+	 */
+	public DepartmentScore getDepartmentManagerScore(Staff staff,int year,int month)throws Exception{
+		DepartmentScore departmentScore=new DepartmentScore();
+		
+		String sql="select d.department_id,d.department_name,d.higher_department_id,ds.total_score,ds.annotation " +
+		"from department d,department_score ds " +
+		"where d.department_id=ds.department_id " +
+		"and ds.which_year=? and ds.which_month=? " +
+		"and d.department_id=?";
+
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+
+		try{
+			connection=DataBaseUtil.getConnection();
+	
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, year);
+			preparedStatement.setInt(2, month);
+			preparedStatement.setInt(3, staff.getDepartment().getDepartmentId());
+	
+			resultSet=preparedStatement.executeQuery();
+	
+			if(resultSet.next()){
+				departmentScore=new DepartmentScore(new Department(resultSet.getInt("d.department_id"),resultSet.getString("d.department_name"),resultSet.getInt("d.higher_department_id")),
+				resultSet.getFloat("ds.total_score"));
+				departmentScore.setInstruction(resultSet.getString("ds.annotation"));
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return departmentScore;
+	}
+	
+	/**
+	 * 根据staff，找出对应的评分细则的所有记录
+	 * @param staff
+	 * @param time
+	 * @return
+	 * @throws Exception
+	 */
+	public List<StaffScoreRecord> getAllStaffScoreRecord(Staff staff,long time)throws Exception{
+		List<StaffScoreRecord> staffScoreRecordList=new ArrayList<StaffScoreRecord>();
+		String sql="select ssrd.staff_score_record_id," +
+				"ssrd.scored_from_staff_id,fs.staff_name,fs.staff_no,fs.staff_sex,fs.staff_password,fs.department_id,fd.department_name,fd.higher_department_id," +
+					"fs.post_id,fp.post_name,fs.role_id,fr.role_name,fr.role_description," +
+				"ssrd.scored_to_staff_id,ts.staff_name,ts.staff_no,ts.staff_sex,ts.staff_password,ts.department_id,td.department_name,td.higher_department_id," +
+					"ts.post_id,tp.post_name,ts.role_id,tr.role_name,tr.role_description," +
+				"ssrd.score_item_id,ssi.score_item_name,ssi.score_weight,ssi.score_description," +
+					"ssi.score_standard1,ssi.score_standard2,ssi.score_standard3,ssi.score_standard4,ssi.score_standard5,ssi.score_creation_date,ssi.score_in_use," +
+				"ssrd.score,ssrd.score_date,ssrd.which_year,ssrd.which_month,ssrd.modify_times " +
+				"from staff_score_relation ssr,staff_score_item ssi,staff_score_record ssrd,staff fs,staff ts,department fd,department td,post fp,post tp,role fr,role tr " +
+				"where ssr.score_item_id=ssi.score_item_id " +
+				"and ssi.score_item_id=ssrd.score_item_id " +
+				"and ssrd.scored_from_staff_id=fs.staff_id " +
+				"and fs.department_id=fd.department_id "+
+				"and fs.post_id=fp.post_id "+
+				"and fs.role_id=fr.role_id "+
+				"and ssrd.scored_to_staff_id=ts.staff_id " +
+				"and ts.department_id=td.department_id "+
+				"and ts.post_id=tp.post_id "+
+				"and ts.role_id=tr.role_id "+
+				"and ssi.score_in_use=1 "+
+				"and ts.staff_id=? "+
+				"and ssr.department_id=? " +
+				"and ssr.post_id=? "+
+				"and unix_timestamp(ssrd.score_date)>=?";
+		
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, staff.getStaffId());
+			preparedStatement.setInt(2, staff.getDepartment().getDepartmentId());
+			preparedStatement.setInt(3, staff.getPost().getPostId());
+			preparedStatement.setLong(4, time);
+			
+			resultSet=preparedStatement.executeQuery();
+			while(resultSet.next()){
+				StaffScoreItem staffScoreItem=new StaffScoreItem(resultSet.getInt("ssrd.score_item_id"),
+						resultSet.getString("ssi.score_item_name"),resultSet.getFloat("ssi.score_weight"),
+						resultSet.getString("ssi.score_description"),resultSet.getString("ssi.score_standard1"),
+						resultSet.getString("ssi.score_standard2"),resultSet.getString("ssi.score_standard3"),
+						resultSet.getString("ssi.score_standard4"),resultSet.getString("ssi.score_standard5"),
+						resultSet.getDate("ssi.score_creation_date"), resultSet.getInt("ssi.score_in_use"));
+				
+				
+				StaffScoreRecord staffScoreRecord=new StaffScoreRecord(resultSet.getInt("ssrd.staff_score_record_id"),
+						new Staff(resultSet.getInt("ssrd.scored_from_staff_id"),resultSet.getString("fs.staff_name"),resultSet.getInt("fs.staff_no"),resultSet.getString("fs.staff_sex"),resultSet.getString("fs.staff_password"),
+								new Department(resultSet.getInt("fs.department_id"),resultSet.getString("fd.department_name"),resultSet.getInt("fd.higher_department_id")),
+								new Post(resultSet.getInt("fs.post_id"),resultSet.getString("fp.post_name")),
+								new Role(resultSet.getInt("fs.role_id"),resultSet.getString("fr.role_name"),resultSet.getString("fr.role_description"))),
+						new Staff(resultSet.getInt("ssrd.scored_to_staff_id"),
+								resultSet.getString("ts.staff_name"),resultSet.getInt("ts.staff_no"),resultSet.getString("ts.staff_sex"),resultSet.getString("ts.staff_password"),
+								new Department(resultSet.getInt("ts.department_id"),resultSet.getString("td.department_name"),resultSet.getInt("td.higher_department_id")),
+								new Post(resultSet.getInt("ts.post_id"),resultSet.getString("tp.post_name")),
+								new Role(resultSet.getInt("ts.role_id"),resultSet.getString("tr.role_name"),resultSet.getString("tr.role_description"))),
+						staffScoreItem,
+						resultSet.getFloat("ssrd.score"),resultSet.getDate("ssrd.score_date")
+						,resultSet.getInt("ssrd.which_year")
+						,resultSet.getInt("ssrd.which_month")
+						,resultSet.getInt("ssrd.modify_times")
+						);
+				staffScoreRecordList.add(staffScoreRecord);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return staffScoreRecordList;
+	}
+	
+	
+	
+	/**
+	 * 根据staff，找出对应的评分细则的所有记录
+	 * @param staff
+	 * @param time
+	 * @return
+	 * @throws Exception
+	 */
+	public List<StaffScoreRecord> getAllStaffScoreRecord(Staff staff,long startTime,long endTime)throws Exception{
+		List<StaffScoreRecord> staffScoreRecordList=new ArrayList<StaffScoreRecord>();
+		String sql="select ssrd.staff_score_record_id," +
+				"ssrd.scored_from_staff_id,fs.staff_name,fs.staff_no,fs.staff_sex,fs.staff_password,fs.department_id,fd.department_name,fd.higher_department_id," +
+					"fs.post_id,fp.post_name,fs.role_id,fr.role_name,fr.role_description," +
+				"ssrd.scored_to_staff_id,ts.staff_name,ts.staff_no,ts.staff_sex,ts.staff_password,ts.department_id,td.department_name,td.higher_department_id," +
+					"ts.post_id,tp.post_name,ts.role_id,tr.role_name,tr.role_description," +
+				"ssrd.score_item_id,ssi.score_item_name,ssi.score_weight,ssi.score_description," +
+					"ssi.score_standard1,ssi.score_standard2,ssi.score_standard3,ssi.score_standard4,ssi.score_standard5,ssi.score_creation_date,ssi.score_in_use," +
+				"ssrd.score,ssrd.score_date,ssrd.which_year,ssrd.which_month,ssrd.modify_times " +
+				"from staff_score_relation ssr,staff_score_item ssi,staff_score_record ssrd,staff fs,staff ts,department fd,department td,post fp,post tp,role fr,role tr " +
+				"where ssr.score_item_id=ssi.score_item_id " +
+				"and ssi.score_item_id=ssrd.score_item_id " +
+				"and ssrd.scored_from_staff_id=fs.staff_id " +
+				"and fs.department_id=fd.department_id "+
+				"and fs.post_id=fp.post_id "+
+				"and fs.role_id=fr.role_id "+
+				"and ssrd.scored_to_staff_id=ts.staff_id " +
+				"and ts.department_id=td.department_id "+
+				"and ts.post_id=tp.post_id "+
+				"and ts.role_id=tr.role_id "+
+				"and ssi.score_in_use=1 "+
+				"and ts.staff_id=? "+
+				"and ssr.department_id=? " +
+				"and ssr.post_id=? "+
+				"and unix_timestamp(ssrd.score_date) between ? and ?";
+		
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, staff.getStaffId());
+			preparedStatement.setInt(2, staff.getDepartment().getDepartmentId());
+			preparedStatement.setInt(3, staff.getPost().getPostId());
+			preparedStatement.setLong(4, startTime);
+			preparedStatement.setLong(5, endTime);
+			
+			resultSet=preparedStatement.executeQuery();
+			while(resultSet.next()){
+				StaffScoreItem staffScoreItem=new StaffScoreItem(resultSet.getInt("ssrd.score_item_id"),resultSet.getString("ssi.score_item_name"),resultSet.getFloat("ssi.score_weight"),
+						resultSet.getString("ssi.score_description"),resultSet.getString("ssi.score_standard1"),
+						resultSet.getString("ssi.score_standard2"),resultSet.getString("ssi.score_standard3"),
+						resultSet.getString("ssi.score_standard4"),resultSet.getString("ssi.score_standard5"),
+						resultSet.getDate("ssi.score_creation_date"), resultSet.getInt("ssi.score_in_use"));
+				StaffScoreRecord staffScoreRecord=new StaffScoreRecord(resultSet.getInt("ssrd.staff_score_record_id"),
+						new Staff(resultSet.getInt("ssrd.scored_from_staff_id"),resultSet.getString("fs.staff_name"),resultSet.getInt("fs.staff_no"),resultSet.getString("fs.staff_sex"),resultSet.getString("fs.staff_password"),
+								new Department(resultSet.getInt("fs.department_id"),resultSet.getString("fd.department_name"),resultSet.getInt("fd.higher_department_id")),
+								new Post(resultSet.getInt("fs.post_id"),resultSet.getString("fp.post_name")),
+								new Role(resultSet.getInt("fs.role_id"),resultSet.getString("fr.role_name"),resultSet.getString("fr.role_description"))),
+						new Staff(resultSet.getInt("ssrd.scored_to_staff_id"),resultSet.getString("ts.staff_name"),resultSet.getInt("ts.staff_no"),resultSet.getString("ts.staff_sex"),resultSet.getString("ts.staff_password"),
+								new Department(resultSet.getInt("ts.department_id"),resultSet.getString("td.department_name"),resultSet.getInt("td.higher_department_id")),
+								new Post(resultSet.getInt("ts.post_id"),resultSet.getString("tp.post_name")),
+								new Role(resultSet.getInt("ts.role_id"),resultSet.getString("tr.role_name"),resultSet.getString("tr.role_description"))),
+						staffScoreItem,
+						resultSet.getFloat("ssrd.score"),resultSet.getDate("score_date"),resultSet.getInt("ssrd.which_year"),resultSet.getInt("ssrd.which_month"),resultSet.getInt("modify_times"));
+				staffScoreRecordList.add(staffScoreRecord);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return staffScoreRecordList;
+	}
+	/**
+	 * 将计算出来的分数插入到“员工得分表”中
+	 * @param staff
+	 * @param totalScore
+	 * @param year
+	 * @param month
+	 * @throws Exception
+	 */
+	public void insertDataTostaffScore(Staff staff,float totalScore,int year,int month,String annotation)throws Exception{
+		String sql="insert into staff_score(staff_id,staff_score,which_year,which_month,annotation) values(?,?,?,?,?);";
+		
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, staff.getStaffId());
+			preparedStatement.setFloat(2, totalScore);
+			preparedStatement.setInt(3, year);
+			preparedStatement.setInt(4, month);
+			preparedStatement.setString(5, annotation);
+			
+			preparedStatement.executeUpdate();
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(preparedStatement, connection);
+		}
+		
+	}
+	/**
+	 * 获取所有员工的绩效得分
+	 * @param year
+	 * @param month
+	 * @return
+	 * @throws Exception
+	 */
+	public List<StaffScore> getStaffScoreList(int year,int month)throws Exception{
+		List<StaffScore> staffScoreList=new ArrayList<StaffScore>();
+		String sql="select s.staff_id,s.staff_name,s.staff_sex,d.department_name,ss.staff_score,ss.annotation " +
+				"from staff_score ss,staff s,department d " +
+				"where ss.staff_id=s.staff_id and s.department_id=d.department_id " +
+				"and which_year=? and which_month=?";
+		
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+
+		try{
+			connection=DataBaseUtil.getConnection();
+	
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, year);
+			preparedStatement.setInt(2, month);
+			
+			resultSet=preparedStatement.executeQuery();
+			while(resultSet.next()){
+				Staff staff=new Staff();
+				staff.setStaffId(resultSet.getInt("s.staff_id"));
+				staff.setStaffName(resultSet.getString("s.staff_name"));
+				staff.setStaffSex(resultSet.getString("s.staff_sex"));
+				Department department=new Department();
+				department.setDepartmentName(resultSet.getString("d.department_name"));
+				staff.setDepartment(department);
+				StaffScore staffScore=new StaffScore();
+				staffScore.setStaff(staff);
+				staffScore.setTotalScore(resultSet.getFloat("ss.staff_score"));
+				staffScore.setInstruction(resultSet.getString("ss.annotation"));
+				
+				staffScoreList.add(staffScore);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return staffScoreList;
+	}
+	
+	
+//=============================================================以下为员工计算绩效考评分数2.0版提供数据支持===================================================================================
+	//----------------------------为计算总经理绩效考评分数提供数据支持------------------------------------------
+	/**
+	 * 获取市公司各部门的得分列表
+	 * 								总经理
+	 */
+	public List<DepartmentScore> getCityDepartmentScoreList(int year,int month)throws Exception{
+		List<DepartmentScore> departmentScoreList=new ArrayList<DepartmentScore>();
+		String sql="select ds.total_score,ds.annotation,d.department_id,d.department_name,d.higher_department_id " +
+				"from department_score ds,department d " +
+				"where ds.department_id=d.department_id " +
+				"and which_year=? and which_month=? " +
+				"and ds.department_id in(" +
+											"select od.department_id " +
+											"from department od " +
+											"where od.higher_department_id in(" +
+																				"select ind.department_id " +
+																				"from department ind,staff s,post p " +
+																				"where s.department_id=ind.department_id " +
+																				"and s.post_id=p.post_id " +
+																				"and p.post_name='副总经理'" +
+																			")" +
+										");";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, year);
+			preparedStatement.setInt(2, month);
+			
+			resultSet=preparedStatement.executeQuery();
+			while(resultSet.next()){
+				DepartmentScore departmentScore=new DepartmentScore();
+				departmentScore.setDepartment(new Department(resultSet.getInt("d.department_id"),
+						resultSet.getString("d.department_name"),resultSet.getInt("d.higher_department_id")));
+				departmentScore.setInstruction(resultSet.getString("ds.annotation"));
+				departmentScore.setScore(resultSet.getFloat("ds.total_score"));
+				
+				departmentScoreList.add(departmentScore);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return departmentScoreList;
+	}
+	/**
+	 * 获取区营业部（市分公司）的绩效考评得分列表
+	 * 										总经理
+	 * @param year
+	 * @param month
+	 * @return
+	 * @throws Exception
+	 */
+	public List<DepartmentScore> getDistinguishBusinessDepartmentScoreList(int year,int month)throws Exception{
+		List<DepartmentScore> departmentScoreList=new ArrayList<DepartmentScore>();
+		String sql="select ds.total_score,ds.annotation,d.department_id,d.department_name,d.higher_department_id " +
+				"from department_score ds,department d " +
+				"where ds.department_id=d.department_id " +
+				"and ds.which_year=? and ds.which_month=? " +
+				"and ds.department_id in(" +
+											"select od.department_id " +
+											"from department od " +
+											"where od.higher_department_id in(" +
+																				"select ind.department_id " +
+																				"from department ind " +
+																				"where ind.department_name='总经理'" +
+																			  ") " +
+											"and od.department_id not in(" +
+																				"select innd.department_id from department innd,staff s,post p " +
+																				"where s.department_id=innd.department_id " +
+																				"and s.post_id=p.post_id " +
+																				"and p.post_name='副总经理'" +
+																		 ")" +
+										");";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, year);
+			preparedStatement.setInt(2, month);
+			
+			resultSet=preparedStatement.executeQuery();
+			while(resultSet.next()){
+				DepartmentScore departmentScore=new DepartmentScore();
+				departmentScore.setDepartment(new Department(resultSet.getInt("d.department_id"),
+						resultSet.getString("d.department_name"),resultSet.getInt("d.higher_department_id")));
+				departmentScore.setInstruction(resultSet.getString("ds.annotation"));
+				departmentScore.setScore(resultSet.getFloat("ds.total_score"));
+				
+				departmentScoreList.add(departmentScore);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}	
+		return departmentScoreList;
+	}
+	/**
+	 * 获取区（市）营业部（分公司）的任务进度
+	 * @param year
+	 * @param month
+	 * @return
+	 * @throws Exception
+
+	public float getTaskSchedule(int year,int month)throws Exception{
+		float taskSchedule=0;//0.8f;
+		String sql1 = " select task_progress from task_progress "
+			+ "where which_year=? and which_month=? ;";
+		
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection = DataBaseUtil.getConnection();
+			preparedStatement = connection.prepareStatement(sql1);
+			preparedStatement.setInt(1, year);
+			preparedStatement.setInt(2, month);
+			
+			ResultSet rs = preparedStatement.executeQuery();
+			
+			if (rs.next()) {
+				taskSchedule = rs.getFloat("task_progress");
+			} 
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return taskSchedule;
+	}
+	
+		 */
+	//----------------------------市公司部门员工计算分数时提供数据服务-----------------------------------------------
+	
+	/**
+	 * 查询staff所属部门中，除主任和副主任以外的其他员工
+	 */
+	public List<Staff> getCityDepartmentStaff(Staff staff)throws Exception{
+		List<Staff> staffList=new ArrayList<Staff>();
+		String sql="select s.staff_id,s.staff_name,s.staff_no,s.staff_sex,s.staff_password,s.department_id,d.department_name,d.higher_department_id," +
+				"s.post_id,p.post_name,s.role_id,r.role_name,r.role_description " +
+				"from staff s,department d,post p,role r " +
+				"where s.department_id=d.department_id and s.post_id=p.post_id and s.role_id=r.role_id " +
+				"and d.department_id=? " +
+				"and p.post_name<>'市公司部门主任' " +
+				"and p.post_name<>'市公司部门副主任';";
+		
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, staff.getDepartment().getDepartmentId());
+			
+			resultSet=preparedStatement.executeQuery();
+			while(resultSet.next()){
+				Staff s=new Staff(resultSet.getInt("s.staff_id"),resultSet.getString("s.staff_name"),resultSet.getInt("s.staff_no"),resultSet.getString("s.staff_sex"),resultSet.getString("s.staff_password"),
+									new Department(resultSet.getInt("s.department_id"),resultSet.getString("d.department_name"),resultSet.getInt("d.higher_department_id")),
+									new Post(resultSet.getInt("s.post_id"), resultSet.getString("p.post_name")), 
+				    				new Role(resultSet.getInt("s.role_id"), resultSet.getString("r.role_name"), resultSet.getString("r.role_description")));
+				staffList.add(s);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return staffList;
+	}
+	//------------------------------------------------为计算各区（市）营业部（分公司）副经理提供数据支持-----------------------------------------------------
+	/**
+	 * 根据副经理，找到对应的营业部得分
+	 */
+	public DepartmentScore getDistrictSalesDepartmentScore(Staff staff,int year,int month)throws Exception{
+		DepartmentScore departmentScore=new DepartmentScore();
+		String sql="select ds.total_score,ds.annotation,ds.department_id,od.department_name,od.higher_department_id " +
+				"from department_score ds,department od " +
+				"where ds.department_id=od.department_id " +
+				"and ds.which_year=? " +
+				"and ds.which_month=? " +
+				"and ds.department_id=(" +
+										"select d.higher_department_id " +
+										"from department d " +
+										"where d.department_id=?" +
+									  ");";
+		
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, year);
+			preparedStatement.setInt(2, month);
+			preparedStatement.setInt(3, staff.getDepartment().getDepartmentId());
+			
+			resultSet=preparedStatement.executeQuery();
+			
+			if(resultSet.next()){
+				departmentScore.setDepartment(new Department(resultSet.getInt("ds.department_id"),
+						resultSet.getString("od.department_name"),resultSet.getInt("od.higher_department_id")));
+				departmentScore.setInstruction(resultSet.getString("ds.annotation"));
+				departmentScore.setScore(resultSet.getFloat("ds.total_score"));
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return departmentScore;
+	}
+
+	//------------------------------------------------为计算各区（市）营业部（分公司）科长提供数据支持-------------------------------------------------------
+	/**
+	 * 获取科长或副科长所属科室的所属营业部或分公司
+	 */
+	public Department getHigherDepartment(Staff staff)throws Exception{
+		Department department=new Department();
+		//String sql="select department_id,department_name,higher_department_id from department where higher_department_id=?";
+		String sql="select od.department_id,od.department_name,od.higher_department_id from department od where department_id=(select d.higher_department_id from department d where d.department_id=?)";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, staff.getDepartment().getHigherDepartmentId());
+			
+			resultSet=preparedStatement.executeQuery();
+			
+			if(resultSet.next()){
+				department.setDepartmentId(resultSet.getInt("od.department_id"));
+				department.setDepartmentName(resultSet.getString("od.department_name"));
+				department.setHigherDepartmentId(resultSet.getInt("od.higher_department_id"));
+			}
+			
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return department;
+	}
+	/**
+	 * 获取营业部下属所有科室
+	 * @param department
+	 * @return
+	 * @throws Exception
+	 */
+	public List<Department> getDepartmentListByDepartment(Department department)throws Exception{
+		List<Department> departmentList=new ArrayList<Department>();
+		String sql="select d.department_id,d.department_name,d.higher_department_id " +
+				"from department d,staff s,post p " +
+				"where s.department_id=d.department_id and s.post_id=p.post_id and p.post_name='区营业部科室科长' " +
+				"and d.higher_department_id in (select innd.department_id from department innd where innd.higher_department_id=?)";
+		
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, department.getDepartmentId());
+			
+			resultSet=preparedStatement.executeQuery();
+			
+			while(resultSet.next()){
+				Department d=new Department();
+				d.setDepartmentId(resultSet.getInt("department_id"));
+				d.setDepartmentName(resultSet.getString("department_name"));
+				d.setHigherDepartmentId(resultSet.getInt("higher_department_id"));
+				
+				departmentList.add(d);
+			}
+			
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return departmentList;
+	}
+	/**
+	 * 获取科长所属营业部的得分,科室的得分
+	 * @param department
+	 * @return
+	 * @throws Exception
+	 */
+	public DepartmentScore getDepartmentScoreByDepartment(Department department,int year,int month)throws Exception{
+		DepartmentScore departmentScore=new DepartmentScore();
+		String sql="select d.department_id,d.department_name,d.higher_department_id,ds.total_score,ds.which_year,ds.which_month,ds.annotation " +
+				"from department_score ds,department d " +
+				"where ds.department_id=d.department_id " +
+				"and ds.which_year=? "+
+				"and ds.which_month=? "+
+				"and ds.department_id=?";
+		
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, year);
+			preparedStatement.setInt(2, month);
+			preparedStatement.setInt(3, department.getDepartmentId());
+			
+			resultSet=preparedStatement.executeQuery();
+			
+			if(resultSet.next()){
+				departmentScore.setDepartment(new Department(resultSet.getInt("d.department_id"),resultSet.getString("d.department_name"),resultSet.getInt("d.higher_department_id")));
+				departmentScore.setInstruction(resultSet.getString("ds.annotation"));
+				departmentScore.setMonth(resultSet.getInt("ds.which_month"));
+				departmentScore.setYear(resultSet.getInt("ds.which_year"));
+				departmentScore.setScore(resultSet.getFloat("ds.total_score"));
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return departmentScore;
+	}
+	
+	//---------------------------------------为计算各区（市）营业部（分公司）科员提供数据支持-------------------------------------------------------------
+	/**
+	 * 查询staff所属科室中，除科长和副科长以外的其他员工
+	 */
+	public List<Staff> getSectionMember(Staff staff)throws Exception{
+		List<Staff> staffList=new ArrayList<Staff>();
+		String sql="select s.staff_id,s.staff_name,s.staff_no,s.staff_sex,s.staff_password,s.department_id,d.department_name,d.higher_department_id," +
+				"s.post_id,p.post_name,s.role_id,r.role_name,r.role_description " +
+				"from staff s,department d,post p,role r " +
+				"where s.department_id=d.department_id and s.post_id=p.post_id and s.role_id=r.role_id " +
+				"and d.department_id=? " +
+				"and p.post_name<>'区营业部科室科长' " +
+				"and p.post_name<>'区营业部科室副科长';";
+		
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, staff.getDepartment().getDepartmentId());
+			
+			resultSet=preparedStatement.executeQuery();
+			while(resultSet.next()){
+				Staff s=new Staff(resultSet.getInt("s.staff_id"),resultSet.getString("s.staff_name"),resultSet.getInt("s.staff_no"),resultSet.getString("s.staff_sex"),resultSet.getString("s.staff_password"),
+									new Department(resultSet.getInt("s.department_id"),resultSet.getString("d.department_name"),resultSet.getInt("d.higher_department_id")),
+									new Post(resultSet.getInt("s.post_id"), resultSet.getString("p.post_name")), 
+				    				new Role(resultSet.getInt("s.role_id"), resultSet.getString("r.role_name"), resultSet.getString("r.role_description")));
+				staffList.add(s);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return staffList;
+	}
+	
+//================================================为完善基本功能提供数据支持============================================
+	//------------------------------在部门计算分数之前，还应该判断“重点工作”打分是否结束----------------------------------------------
+	/**
+	 * 根据重点工作条目，找到对应的打分记录
+	 */
+	public DepartmentScoreRecord getKeyWorkScoreRecord(DepartmentScoreItem departmentScoreItem,long startTime,long endTime)throws Exception{
+		DepartmentScoreRecord departmentScoreRecord=null;
+		String sql="select dsr.department_score_record_id,dsr.score,dsr.score_comment,dsr.score_date,dsr.which_year,dsr.which_month,dsr.modify_times," +
+		"fd.department_id,fd.department_name,fd.higher_department_id,td.department_id,td.department_name,td.higher_department_id " +
+		"from department_score_record dsr,department fd,department td " +
+		"where dsr.department_from_id=fd.department_id and dsr.department_to_id=td.department_id " +
+		"and score_item_id=? " +
+		"and unix_timestamp(score_date) between ? and ?;";
+		
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, departmentScoreItem.getDepartmentScoredItemId());
+			preparedStatement.setLong(2, startTime);
+			preparedStatement.setLong(3, endTime);
+			
+			resultSet=preparedStatement.executeQuery();
+			if(resultSet.next()){
+				departmentScoreRecord=new DepartmentScoreRecord(resultSet.getInt("dsr.department_score_record_id"),
+						new Department(resultSet.getInt("fd.department_id"),resultSet.getString("fd.department_name"),resultSet.getInt("fd.higher_department_id")),
+						new Department(resultSet.getInt("td.department_id"),resultSet.getString("td.department_name"),resultSet.getInt("td.higher_department_id")),
+						departmentScoreItem,
+						resultSet.getFloat("dsr.score"),
+						resultSet.getString("dsr.score_comment"),
+						resultSet.getDate("dsr.score_date"),
+						resultSet.getInt("dsr.which_year"),
+						resultSet.getInt("dsr.which_month"),
+						resultSet.getInt("dsr.modify_times")
+
+				);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return departmentScoreRecord;
+	}
+	/**
+	 * 获取“部门评分细则表”中，所有可用“重点工作”条目
+	 * @return
+	 * @throws Exception
+	 */
+	public List<DepartmentScoreItem> getKeyWorkScoreItemList()throws Exception{
+		List<DepartmentScoreItem> departmentScoreItems=new ArrayList<DepartmentScoreItem>();
+		String sql="select dsi.score_item_id,dsi.score_item_name,dsi.score_description,dsi.score_value,dsi.score_reference," +
+				"dsi.score_calculation_method,dsi.department_id,d.department_name,d.higher_department_id," +
+				"dsi.score_category_id,sc.score_category_name,dsi.score_creation_date,dsi.score_in_use " +
+				"from department_score_item dsi,department d,score_category sc " +
+				"where dsi.department_id=d.department_id " +
+				"and dsi.score_category_id=sc.score_category_id " +
+				"and dsi.score_in_use=1 " +
+				"and sc.score_category_name='重点工作';";
+				  
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			
+			resultSet=preparedStatement.executeQuery();
+			while(resultSet.next()){
+				DepartmentScoreItem departmentScoreItem=new DepartmentScoreItem();
+				departmentScoreItem.setDepartment(
+						new Department(resultSet.getInt("dsi.department_id"),resultSet.getString("d.department_name"),
+								resultSet.getInt("d.higher_department_id")));
+				departmentScoreItem.setDepartmentScoredItemId(resultSet.getInt("dsi.score_item_id"));
+				departmentScoreItem.setDepartmentScoreName(resultSet.getString("dsi.score_item_name"));
+				departmentScoreItem.setScoreCalculationMethod(resultSet.getString("dsi.score_calculation_method"));
+				departmentScoreItem.setScoreDate(resultSet.getDate("dsi.score_creation_date"));
+				departmentScoreItem.setScoreDescription(resultSet.getString("dsi.score_description"));
+				departmentScoreItem.setScoreInUse(resultSet.getInt("dsi.score_in_use"));
+				departmentScoreItem.setScoreItemCategory(new ScoreItemCategory(resultSet.getInt("dsi.score_category_id"),resultSet.getString("sc.score_category_name")));
+				departmentScoreItem.setScoreReference(resultSet.getString("dsi.score_reference"));
+				departmentScoreItem.setScoreValue(resultSet.getFloat("dsi.score_value"));
+				
+				departmentScoreItems.add(departmentScoreItem);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return departmentScoreItems;
+	}
+	/**
+	 * 部门分数被修改了之后，重新计算完员工绩效之后，更新相应的绩效
+	 * @param staff
+	 * @param totalScore
+	 * @param year
+	 * @param month
+	 * @param annotation
+	 * @throws Exception
+	 */
+	public void updateDataTostaffScore(Staff staff,float totalScore,int year,int month,String annotation)throws Exception{
+		//String sql="insert into staff_score(staff_id,staff_score,which_year,which_month,annotation) values(?,?,?,?,?);";
+		String sql="update staff_score set staff_score=?,annotation=? where staff_id=? and which_year=? and which_month=?";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setFloat(1, totalScore);
+			preparedStatement.setString(2, annotation);
+			preparedStatement.setInt(3, staff.getStaffId());
+			preparedStatement.setInt(4, year);
+			preparedStatement.setInt(5, month);
+			
+			preparedStatement.executeUpdate();
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(preparedStatement, connection);
+		}
+		
+	}
+	//---------------------------部门计算分数只能计算一次------------------------------------
+	/**
+	 * 获取当前部门绩效结果的数量
+	 * @param year
+	 * @param month
+	 * @return
+	 * @throws Exception
+	 */
+	public int getNowDepartmentScoreQuantity(int year,int month)throws Exception{
+		int count=0;
+		String sql="select count(*) c from department_score where which_year=? and which_month=?";
+		
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, year);
+			preparedStatement.setInt(2, month);
+			
+			resultSet=preparedStatement.executeQuery();
+			if(resultSet.next()){
+				count=resultSet.getInt("c");
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return count;
+	}
+	//--------------------------------------员工计算只能计算一次----------------------------------------------
+	public int getNowStaffScoreQuantity(int year,int month)throws Exception{
+		int count=0;
+		String sql="select count(*) c from staff_score where which_year=? and which_month=?";
+		
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, year);
+			preparedStatement.setInt(2, month);
+			
+			resultSet=preparedStatement.executeQuery();
+			if(resultSet.next()){
+				count=resultSet.getInt("c");
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return count;
+	}
+	//-------------------------------------员工算分之前，应该录入“任务进度”--------------------------------------
+	/**
+	 * 确定“任务进度”是否已经被录入
+	 * @param year
+	 * @param month
+	 * @return
+	 * @throws Exception
+	
+	public boolean check(int year, int month) throws Exception {
+		// TODO Auto-generated method stubList<Role> roles = null;
+		boolean res;
+		String sql1 = " select task_progress from task_progress "
+				+ "where which_year=? and which_month=? ;";
+		
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection = DataBaseUtil.getConnection();
+			preparedStatement = connection.prepareStatement(sql1);
+			preparedStatement.setInt(1, year);
+			preparedStatement.setInt(2, month);
+
+			resultSet = preparedStatement.executeQuery();
+
+			if (resultSet.next()) {
+				res = true;
+			} else
+				res = false;
+		}catch(Exception e){
+			e.printStackTrace();
+			res=false;
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return res;
+	}
+	
+	 */
+	
+//===================================================================================================================================
+	
+	public List<DepartmentKeyWork> getDepartmentKeyWorkList(int departmentId)throws Exception{
+		List<DepartmentKeyWork> departmentKeyWorks=new ArrayList<DepartmentKeyWork>();
+		
+		String sql="select dwk.key_work_id,dwk.department_id,d.department_name,d.higher_department_id," +
+				"dwk.key_work_content,dwk.start_year,dwk.start_month,dwk.end_year,dwk.end_month " +
+				"from department_key_work dwk,department d where dwk.department_id=d.department_id and d.department_Id=?";
+		
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, departmentId);
+			
+			resultSet=preparedStatement.executeQuery();
+			while(resultSet.next()){
+				DepartmentKeyWork departmentKeyWork=new DepartmentKeyWork(resultSet.getInt("dwk.key_work_id"),
+						new Department(resultSet.getInt("dwk.department_id"),resultSet.getString("d.department_name"),resultSet.getInt("d.higher_department_id")),
+						resultSet.getString("dwk.key_work_content"),resultSet.getInt("dwk.start_year"),
+						resultSet.getInt("dwk.start_month"),resultSet.getInt("dwk.end_year"),resultSet.getInt("dwk.end_month"));
+				departmentKeyWorks.add(departmentKeyWork);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		
+		return departmentKeyWorks;
+	}
+	
+}

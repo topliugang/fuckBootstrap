@@ -1,0 +1,17 @@
+package com.chinanetwork.performance.service;
+
+import com.chinanetwork.performance.dao.TaskProgressDao;
+
+public class StartScoreService {
+
+	private TaskProgressDao taskProgressDao = new TaskProgressDao();
+
+	public boolean check(int year, int month) throws Exception {
+		// TODO Auto-generated method stub
+		return taskProgressDao.check(year, month);
+	}
+
+	
+	
+	
+}

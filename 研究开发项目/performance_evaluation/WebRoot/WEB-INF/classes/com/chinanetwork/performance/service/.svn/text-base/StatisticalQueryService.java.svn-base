@@ -1,0 +1,138 @@
+package com.chinanetwork.performance.service;
+
+import java.sql.Date;
+import java.util.Calendar;
+import java.util.List;
+
+import com.chinanetwork.performance.bean.DepartmentScore;
+import com.chinanetwork.performance.bean.Staff;
+import com.chinanetwork.performance.bean.StaffScore;
+import com.chinanetwork.performance.dao.StatisticalQueryDao;
+import com.chinanetwork.performance.util.ConfigurationDataUtil;
+
+/**
+ * 主要负责统计查询的业务逻辑
+ * @author Administrator
+ *
+ */
+public class StatisticalQueryService {
+
+	private StatisticalQueryDao statisticalQueryDao=new StatisticalQueryDao();
+	/**
+	 * 获得部门得分列表
+	 * @param departmentName
+	 * @return
+	 * @throws Exception
+	 */
+	public List<DepartmentScore> getDepartmentScoreList(int year, int month)throws Exception{
+		return statisticalQueryDao.getDepartmentScore(year, month, year, month);
+	}
+	
+	public List<DepartmentScore> getDepartmentScoreList(int departmentId, int startyear, int startmonth, int endyear, int endmonth)throws Exception{
+		if(departmentId == -1)
+			return statisticalQueryDao.getDepartmentScore(startyear, startmonth, endyear, endmonth);
+		else
+			return statisticalQueryDao.getDepartmentScore(departmentId, startyear, startmonth, endyear, endmonth);
+	}
+	/**
+	 * 修改部门得分
+	 * @param departmentIdStr
+	 * @param scoreStr
+	 * @param instruction
+	 * @return
+	 * @throws Exception
+	 */
+	public boolean modifyDepartmentScore(int departmentScoreId,float score,String instruction)throws Exception{
+		//获取当前时间
+		return statisticalQueryDao.updateDepartmentScore(departmentScoreId, score, instruction);
+	}
+	
+
+//==================================================================以下为“员工得分修改”提供服务========================================================================================
+	/**
+	 * 根据所填写的员工ID找到对应的员工得分
+	 */
+	public List<StaffScore> getStaffList(int staffId)throws Exception{
+		Calendar calendar=Calendar.getInstance();
+		calendar.setTime(new Date(System.currentTimeMillis()));
+		int year=calendar.get(Calendar.YEAR);
+		int month=calendar.get(Calendar.MONTH)+1;
+		return statisticalQueryDao.getStaffScore(staffId, year, month, year, month);
+	}
+	
+	public boolean modifyStaffScore(int staffScoreId,float staffScore,String instruction)throws Exception{
+		return statisticalQueryDao.updateStaffScore(staffScoreId, staffScore, instruction);
+	}
+	
+	public List<StaffScore> getStaffScoreList(int year, int month)throws Exception{
+		List<StaffScore> staffScoreList=statisticalQueryDao.getStaffScore(year, month, year, month);
+		return staffScoreList;
+	}
+	
+	public List<StaffScore> getStaffScoreList(int staffId, int startyear, int startmonth, int endyear, int endmonth) throws Exception
+	{
+		if(staffId == -1)
+			return statisticalQueryDao.getStaffScore(startyear, startmonth, endyear, endmonth);
+		else
+			return statisticalQueryDao.getStaffScore(staffId, startyear, startmonth, endyear, endmonth);
+	}
+	
+//==========================================================以下为判断是否已经计算过员工绩效和部门绩效====================================================
+	/**
+	 * 确定“员工算分”是否已经执行过
+	
+	public boolean confirmOnlyCalculateStaffScore()throws Exception{
+		//获取which_year和月份
+		int year=ConfigurationDataUtil.getIntegerVlaue("which_year");
+		int month=ConfigurationDataUtil.getIntegerVlaue("which_month");
+		
+		int quantity=statisticalQueryDao.getNowStaffScoreQuantity(year, month);
+		if(quantity>=1){
+			return false;
+		}else{
+			return true;
+		}
+	}
+	 */
+	/**
+	 * 确定“部门算分”是否已经执行过
+	
+	public boolean confirmOnlyCalculateDepartmentScore()throws Exception{
+		//获取which_year和月份
+		int year=ConfigurationDataUtil.getIntegerVlaue("which_year");
+		int month=ConfigurationDataUtil.getIntegerVlaue("which_month");
+		
+		int quantity=statisticalQueryDao.getNowDepartmentScoreQuantity(year, month);
+		
+		if(quantity>=1){
+			return false;
+		}else{
+			return true;
+		}
+	}
+	 */
+	//===================================================在Excel表格中添加一列，工资列=====================================================
+	
+	public float getSalaryByStaff(Staff staff)throws Exception{
+		float salary=0;
+		salary=statisticalQueryDao.getSalaryByStaffId(staff.getStaffId());
+		return salary;
+	}
+	
+	public List<Integer> departmentScoredYears() throws Exception
+	{
+		return statisticalQueryDao.departmentScoredYears();
+	}
+	public List<Integer> departmentScoredMonths() throws Exception
+	{
+		return statisticalQueryDao.departmentScoredMonths();
+	}
+	public List<Integer> staffScoredYears() throws Exception
+	{
+		return statisticalQueryDao.staffScoredYears();
+	}
+	public List<Integer> staffScoredMonths() throws Exception
+	{
+		return statisticalQueryDao.staffScoredMonths();
+	}
+}

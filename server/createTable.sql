@@ -11,5 +11,15 @@ id integer primary key autoincrement,
 createTime datetime,
 memberId integer,
 title text,
-content text
+content text,
+tag integer
+);
+
+create table tag(
+
+);
+create table postContent(
+id integer primary key autoincrement,
+
+
 );

@@ -1,0 +1,400 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+	pageEncoding="UTF-8"%>
+<%@taglib prefix="s" uri="/struts-tags"%>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+		<title>无标题文档</title>
+		<link href="<%=request.getContextPath()%>/jsp/css/zgyx.css" rel="stylesheet" type="text/css">
+		<script src="<%=request.getContextPath()%>/js/jquery-1.4.3.js" type="text/javascript"></script>
+		<script src="<%=request.getContextPath()%>/js/zgyx.js" type="text/javascript"></script>
+		
+
+<script>
+var  highlightcolor='#eafcd5';
+//此处clickcolor只能用win系统颜色代码才能成功,如果用#xxxxxx的代码就不行,还没搞清楚为什么:(
+var  clickcolor='#51b2f6';
+
+function getElementsByClassName(className,root,tagName) {    //root：父节点，tagName：该节点的标签名。 这两个参数均可有可无
+    if(root){
+        root=typeof root=="string" ? document.getElementById(root) : root;   
+    }else{
+        root=document.body;
+    }
+    tagName=tagName||"*";                                    
+    if (document.getElementsByClassName) {                    //如果浏览器支持getElementsByClassName，就直接的用
+        return root.getElementsByClassName(className);
+    }else { 
+        var tag= root.getElementsByTagName(tagName);    //获取指定元素
+        var tagAll = [];                                    //用于存储符合条件的元素
+        for (var i = 0; i < tag.length; i++) {                //遍历获得的元素
+            for(var j=0,n=tag[i].className.split(' ');j<n.length;j++){    //遍历此元素中所有class的值，如果包含指定的类名，就赋值给tagnameAll
+                if(n[j]==className){
+                    tagAll.push(tag[i]);
+                    break;
+                }
+            }
+        }
+        return tagAll;
+    }
+}
+
+function  changeto(){
+source=event.srcElement;
+if  (source.tagName=="TR"||source.tagName=="TABLE")
+return;
+while(source.tagName!="TD")
+source=source.parentElement;
+source=source.parentElement;
+cs  =  source.children;
+//alert(cs.length);
+if  (cs[0].style.backgroundColor!=highlightcolor&&source.id!="nc"&&cs[0].style.backgroundColor!=clickcolor)
+for(i=0;i<cs.length;i++){
+	cs[i].style.backgroundColor=highlightcolor;
+}
+}
+
+function  changeback(){
+if  (event.fromElement.contains(event.toElement)||source.contains(event.toElement)||source.id=="nc")
+return
+if  (event.toElement!=source&&cs[0].style.backgroundColor!=clickcolor)
+//source.style.backgroundColor=originalcolor
+for(i=0;i<cs.length;i++){
+	cs[i].style.backgroundColor="";
+}
+}
+
+function  clickto(){
+source=event.srcElement;
+if  (source.tagName=="TR"||source.tagName=="TABLE")
+return;
+while(source.tagName!="TD")
+source=source.parentElement;
+source=source.parentElement;
+cs  =  source.children;
+//alert(cs.length);
+if  (cs[0].style.backgroundColor!=clickcolor&&source.id!="nc")
+for(i=0;i<cs.length;i++){
+	cs[i].style.backgroundColor=clickcolor;
+}
+else
+for(i=0;i<cs.length;i++){
+	cs[i].style.backgroundColor="";
+}
+}
+
+
+
+function query()
+{
+	 var select=document.getElementById('querySelect');
+	 var val=select.value;
+	 var form = document.getElementById("departmentForm");
+	 form.action="score_listDepartmentScoredItem?departmentIdChosen="+val;
+	 form.submit();
+}
+
+//获取ajax对象
+function getXhr(){
+	var xhr=null;
+	if(window.XMLHttpRequest){
+		//非IE浏览器
+		xhr=new XMLHttpRequest();
+	}else{
+		xhr=new ActiveXObject('Microsoft.XMLHttp');
+	}
+	return xhr;
+}
+function modifyScore(){
+	/*
+	var select=document.getElementById('querySelect');
+	var val=select.value;
+	
+	var xhr=getXhr();
+	var info="departmentIdChosen="+val;//请求参数
+	xhr.open('post','revokeScore_departmentScoreModifyTime',true);
+	xhr.setRequestHeader('content-type','application/x-www-form-urlencoded');
+	xhr.onreadystatechange=function(){
+		if(xhr.readyState==4){
+			var txt=xhr.responseText;
+			var timeInput=document.getElementById('mTimes');
+			timeInput.value=txt;
+			if(txt!='-1'&&txt!='-2'){
+				alert('你还有'+txt+'次机会');
+				var modiscores=document.getElementsByClassName('myscore');
+				for(var i=0;i<modiscores.length;i++){
+					modiscores[i].disabled="";
+				}
+				document.getElementById('mySubmitButton').style.display='';
+			}else if(txt=='-1'){
+				alert('不能修改了');
+			}else if(txt=='-2'){
+				alert('部门计算已经结束,不能修改了')
+			}
+		}
+	}
+	xhr.send(info);
+*/
+	var moditimes = getElementsByClassName('modiTimes');
+	
+	var modiscores=getElementsByClassName('myscore');
+	var modicomms = getElementsByClassName('mycomm');
+	var modiitems = getElementsByClassName('myitems');
+
+	for(var i=0;i<modiscores.length;i++){
+		if(moditimes[i].value > 0)
+		{
+			modiscores[i].disabled="";
+			modicomms[i].disabled="";
+			modiitems[i].disabled="";
+		}
+	}
+	document.getElementById('mySubmitButton').style.display='';
+}
+function modifyDepartmentScore(){
+	var select=document.getElementById('querySelect');
+	var val=select.value;
+
+	var departmentChoseId=document.getElementById('departmentToId');
+	departmentChoseId.value=val;
+
+	 var form = document.getElementById("modifyForm");
+	 form.submit();
+}
+</script>
+	</head>
+	<body>
+		<table width="100%" border="0" align="center" cellpadding="0"
+			cellspacing="0">
+			<tr>
+				<td height="30">
+					<table width="100%" border="0" cellspacing="0" cellpadding="0">
+						<tr>
+							<td width="15" height="30">
+								<img src="<%=request.getContextPath()%>/jsp/images/tab_03.gif"
+									width="15" height="30" />
+							</td>
+							<td width="241"
+								background="<%=request.getContextPath()%>/jsp/images/tab_05.gif">
+								<img src="<%=request.getContextPath()%>/jsp/images/311.gif"
+									width="16" height="16" />
+								<span class="little_title">部门打分</span>
+							</td>
+
+							<td width="100"
+								background="<%=request.getContextPath()%>/jsp/images/tab_05.gif">
+								<span class="little_title">选择部门:</span>
+							</td>
+
+
+							<form action="score_listDepartmentScoredItem" id="departmentForm">
+							<td width="849"
+								background="<%=request.getContextPath()%>/jsp/images/tab_05.gif">
+								<s:select theme ="simple" list="departmentsScored" listValue="departmentName"
+									listKey="departmentId" name="departmentIdChosen" id="querySelect" onchange="query()" style="width:16%">
+								</s:select> 
+							</td>
+
+							<td width="50"
+								background="<%=request.getContextPath()%>/jsp/images/tab_05.gif">
+								
+									<s:if test="departmentScoredRecords!=null||departmentScoredRecords.size()!=0">
+									<input type="button" value="修改打分" onclick="modifyScore()"/>
+									</s:if>
+								
+							</td>
+							</form>
+
+							<td width="281"
+								background="<%=request.getContextPath()%>/jsp/images/tab_05.gif">
+								<table border="0" align="right" cellpadding="0" cellspacing="0">
+									<tr>
+										<td width="60">
+											&nbsp;
+
+										</td>
+										<td width="60">
+											&nbsp;
+
+										</td>
+									</tr>
+								</table>
+							</td>
+							<td width="14">
+								<img src="<%=request.getContextPath()%>/jsp/images/tab_07.gif"
+									width="14" height="30" />
+							</td>
+						</tr>
+					</table>
+				</td>
+			</tr>
+
+
+			<tr>
+				<td>
+					<table width="100%" border="0" cellspacing="0" cellpadding="0">
+						<tr>
+							<td width="9" height="86"
+								background="<%=request.getContextPath()%>/jsp/images/tab_12.gif">
+								&nbsp;
+							</td>
+							<td bgcolor="#f3ffe3">
+								<form action="score_modifyDepartmentScore" method="post" id="modifyForm">
+								<table width="99%" border="0" align="center" cellpadding="0"
+									cellspacing="1" bgcolor="#c0de98" onmouseover="changeto()"
+									onmouseout="changeback()" class="DGTableStyle">
+									<tr class="DGHeaderStyle">
+										<td width="8%">
+												<div>
+													类别
+												</div>
+											</td>
+										<td width="8%">
+												<div>
+													条目名称
+												</div>
+											</td>
+											<td width="24%">
+												<div>
+													条目描述
+												</div>
+											</td>
+											
+											<td width="10%">
+												<div>
+													基准值
+												</div>
+											</td>
+											<td width="26%">
+												<div>
+													计算方法
+												</div>
+											</td>
+											<td width="6%">
+												<div>
+													分数
+												</div>
+											</td>
+											
+											<td width="4%">
+												<div>
+													打分
+												</div>
+											</td>
+											<td width="14%">
+												<div>
+													描述
+												</div>
+											</td>
+									</tr>
+									<s:iterator value="departmentScoredRecords" var="record"
+										status="st">
+										<tr>
+											<td>
+												<div>
+													<s:property
+														value="departmentScoreItem.scoreItemCategory.departmentScoreCategoryName"></s:property>
+												</div>
+											</td>
+											<td>
+												<div>
+													<s:property value="departmentScoreItem.departmentScoreName"></s:property>
+												</div>
+											</td>
+											<td>
+												<div>
+													<s:property value="departmentScoreItem.scoreDescription"></s:property>
+												</div>
+											</td>
+
+											
+											<td>
+												<div>
+													<s:property value="departmentScoreItem.scoreReference"></s:property>
+												</div>
+											</td>
+											<td>
+												<div>
+													<s:property
+														value="departmentScoreItem.scoreCalculationMethod"></s:property>
+												</div>
+											</td>
+											<td>
+												<div>
+													<s:property value="departmentScoreItem.scoreValue"></s:property>
+												</div>
+											</td>
+											
+											<td>
+												<div>
+													<input type="text" name="departmentScores" value="<s:property value="score" />" class="myscore" disabled="disabled" size="4%"/>
+												</div>
+											</td>
+											<td>
+												<div>
+													<!-- input type="text" name="departmentScoreComments" value="<s:property value="scoreComment" />" class="mycomm" disabled="disabled" size="8%"/-->
+
+													<textarea rows="2" cols="12%" name="departmentScoreComments" class="mycomm" disabled="disabled" ><s:property value="scoreComment" /></textarea>
+												</div>
+												<input type="hidden" name="itemsIds" class="myitems" value="<s:property value="departmentScoreItem.departmentScoredItemId"/>" />
+												<input type="hidden" name="maxScores" value="<s:property value="scoreValue"/>" />
+												<input type="hidden" class="modiTimes" name="modifyTimes" value="<s:property value="modifyTimes"/>" />
+												<input type="hidden" name="recordId" value="<s:property value="id"/>" />
+											</td>
+										</tr>
+									</s:iterator>
+										<tr>
+											<td height="21" colspan="9" bgcolor="#FFFFFF" class="STYLE2">
+												<div align="right">
+													<input type="hidden" name="departmentIdChosen" id="departmentToId"/>
+													<input type="hidden" name="modifyTime" id="mTimes"/>
+													<s:if test="departmentScoredRecords!=null||departmentScoredRecords.size()!=0">
+													<input type="button" id="mySubmitButton" value="提交修改" onclick="modifyDepartmentScore()" style="display:none"/>
+													</s:if>
+												</div>
+											</td>
+										</tr>
+								</table>
+								</form>
+							</td>
+							<td width="9"
+								background="<%=request.getContextPath()%>/jsp/images/tab_16.gif">
+								&nbsp;
+							</td>
+						</tr>
+					</table>
+				</td>
+			</tr>
+			<tr>
+				<td height="29">
+					<table width="100%" border="0" cellspacing="0" cellpadding="0">
+						<tr>
+							<td width="15" height="29">
+								<img src="<%=request.getContextPath()%>/jsp/images/tab_20.gif"
+									width="15" height="29" />
+							</td>
+							<td
+								background="<%=request.getContextPath()%>/jsp/images/tab_21.gif">
+								<table width="100%" border="0" cellspacing="0" cellpadding="0">
+									<tr>
+										<td width="25%" height="29" nowrap="nowrap">
+										<!-- <span class="STYLE1">共120条纪录，当前第1/10页，每页10条纪录</span> -->
+										</td>
+										<td width="75%" valign="top" class="STYLE1">
+										
+										</td>
+									</tr>
+								</table>
+							</td>
+							<td width="14">
+								<img src="<%=request.getContextPath()%>/jsp/images/tab_22.gif"
+									width="14" height="29" />
+							</td>
+						</tr>
+					</table>
+				</td>
+			</tr>
+		</table>
+	</body>
+</html>

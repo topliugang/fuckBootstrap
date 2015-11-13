@@ -1,0 +1,535 @@
+package com.chinanetwork.performance.dao;
+
+import java.sql.Connection;
+import java.sql.Date;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
+
+import com.chinanetwork.performance.bean.Department;
+import com.chinanetwork.performance.bean.DepartmentScore;
+import com.chinanetwork.performance.bean.Post;
+import com.chinanetwork.performance.bean.Staff;
+import com.chinanetwork.performance.bean.StaffScore;
+import com.chinanetwork.performance.util.DataBaseUtil;
+
+/**
+ * 统计查询DAO，主要负责向统计查询功能提供数据支持
+ * @author Administrator
+ *
+ */
+public class StatisticalQueryDao {
+
+	/**
+	 * 根据year month获取departmentscore
+	 * 获取一次考评的所有部门得分
+	 * @param departmentName
+	 * @return
+	 * @throws Exception
+	 */
+	public List<DepartmentScore> getDepartmentScore(int startyear,int startmonth, int endyear, int endmonth)throws Exception{
+		List<DepartmentScore> departmentScores=new ArrayList<DepartmentScore>();
+		String sql;
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		if(startyear == endyear)
+		{
+			sql = "select d.department_id,d.department_name,d.higher_department_id,ds.total_score,ds.which_year,ds.which_month,ds.annotation " +
+				"from department_score ds,department d " +
+				"where ds.department_id=d.department_id " +
+				"and ds.which_year=? and ds.which_month>=? and ds.which_month<=? " +
+				"order by d.department_id asc; ";
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1,startyear);
+			preparedStatement.setInt(2,startmonth);
+			preparedStatement.setInt(3,endmonth);
+		}
+		else
+		{
+			sql="select d.department_id,d.department_name,d.higher_department_id,ds.total_score,ds.which_year,ds.which_month,ds.annotation " +
+				"from department_score ds,department d " +
+				"where ds.department_id=d.department_id " +
+				"and ((ds.which_year=? and ds.which_month>=?) or (ds.which_year=? and ds.which_month<=?) or (ds.which_year>? and ds.which_year<?)) " +
+				"order by d.department_id asc; ";
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1,startyear);
+			preparedStatement.setInt(2,startmonth);
+			preparedStatement.setInt(3,endyear);
+			preparedStatement.setInt(4,endmonth);
+			preparedStatement.setInt(5,startyear);
+			preparedStatement.setInt(6,endyear);
+		}
+		try{
+			resultSet=preparedStatement.executeQuery();
+			while(resultSet.next()){
+				Department department=new Department(resultSet.getInt("d.department_id"),resultSet.getString("d.department_name"),resultSet.getInt("d.higher_department_id"));
+				DepartmentScore departmentScore=new DepartmentScore(department,resultSet.getFloat("ds.total_score"));
+				departmentScore.setYear(resultSet.getInt("ds.which_year"));
+				departmentScore.setMonth(resultSet.getInt("ds.which_month"));
+				departmentScore.setInstruction(resultSet.getString("ds.annotation"));
+				departmentScores.add(departmentScore);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		
+		return departmentScores;
+	}
+	
+	/**
+	 * 根据部门ID 和 year, month 找到对应的部门得分
+	 * @param departmentId
+	 * @param year
+	 * @param month
+	 * @return
+	 * @throws Exception
+	 * 
+	 * fuckfuckfuckfuck!!!!!!!!!!
+	 */
+	public List<DepartmentScore> getDepartmentScore(int departmentId,int startyear,int startmonth, int endyear, int endmonth)throws Exception{
+		List<DepartmentScore> departmentScores=new ArrayList<DepartmentScore>();
+		String sql;
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		if(startyear == endyear)
+		{
+			sql = "select d.department_id,d.department_name,d.higher_department_id,ds.total_score,ds.which_year,ds.which_month,ds.annotation " +
+				"from department_score ds,department d " +
+				"where ds.department_id=d.department_id and d.department_id=? " +
+				"and ds.which_year=? and ds.which_month>=? and ds.which_month<=? " +
+				"order by d.department_id asc; ";
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, departmentId);
+			preparedStatement.setInt(2,startyear);
+			preparedStatement.setInt(3,startmonth);
+			preparedStatement.setInt(4,endmonth);
+		}
+		else
+		{
+			sql="select d.department_id,d.department_name,d.higher_department_id,ds.total_score,ds.which_year,ds.which_month,ds.annotation " +
+				"from department_score ds,department d " +
+				"where ds.department_id=d.department_id and d.department_id=? " +
+				"and ((ds.which_year=? and ds.which_month>=?) or (ds.which_year=? and ds.which_month<=?) or (ds.which_year>? and ds.which_year<?)) " +
+				"order by d.department_id asc; ";
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, departmentId);
+			preparedStatement.setInt(2,startyear);
+			preparedStatement.setInt(3,startmonth);
+			preparedStatement.setInt(4,endyear);
+			preparedStatement.setInt(5,endmonth);
+			preparedStatement.setInt(6,startyear);
+			preparedStatement.setInt(7,endyear);
+		}
+		try{
+			resultSet=preparedStatement.executeQuery();
+			while(resultSet.next()){
+				Department department=new Department(resultSet.getInt("d.department_id"),resultSet.getString("d.department_name"),resultSet.getInt("d.higher_department_id"));
+				DepartmentScore departmentScore=new DepartmentScore(department,resultSet.getFloat("ds.total_score"));
+				departmentScore.setYear(resultSet.getInt("ds.which_year"));
+				departmentScore.setMonth(resultSet.getInt("ds.which_month"));
+				departmentScore.setInstruction(resultSet.getString("ds.annotation"));
+				departmentScores.add(departmentScore);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		
+		return departmentScores;
+	}
+	
+	/**
+	 * 更新部门得分
+	 * @param 根据 departmentscoreId
+	 * @param score
+	 * @param instruction
+	 * @param year
+	 * @param month
+	 * @return
+	 * @throws Exception
+	 */
+	public boolean updateDepartmentScore(int departmentScoreId, float score, String annotation)throws Exception{
+		String sql="update department_score set total_score=?,annotation=?, score_date=? " +
+				"where department_total_score_id=? ;";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setFloat(1, score);
+			preparedStatement.setString(2, annotation);
+			preparedStatement.setDate(3, new Date(System.currentTimeMillis()));
+			preparedStatement.setInt(4, departmentScoreId);
+			
+			preparedStatement.executeUpdate();
+			return true;
+			
+		}catch(Exception e){
+			e.printStackTrace();
+			return false;
+		}
+	}
+	
+	
+//==================================================================以下为“员工分数修改”提供服务==========================================================================
+	/**
+	 * 根据所填写的员工ID找到对应的得分
+	 * 获取一次考评的所有个人得分
+	 */
+	public List<StaffScore> getStaffScore(int startyear,int startmonth, int endyear, int endmonth)throws Exception{
+		List<StaffScore> staffScoreList=new ArrayList<StaffScore>();
+		String sql;
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		if(startyear == endyear)
+		{
+			sql = "select s.staff_id,s.staff_name,d.department_name,p.post_name,ss.staff_score,ss.which_year,ss.which_month,ss.annotation " +
+				"from staff s,staff_score ss,department d,post p " +
+				"where ss.staff_id=s.staff_id and s.post_id=p.post_id and s.department_id=d.department_id " +
+				"and ss.which_year=? and ss.which_month>=? and ss.which_month<=? " +
+				"order by s.staff_id asc ;";
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1,startyear);
+			preparedStatement.setInt(2,startmonth);
+			preparedStatement.setInt(3,endmonth);
+			
+		}
+		else
+		{
+			sql="select s.staff_id,s.staff_name,d.department_name,p.post_name,ss.staff_score,ss.which_year,ss.which_month,ss.annotation " +
+			"from staff s,staff_score ss,department d,post p " +
+			"where ss.staff_id=s.staff_id and s.post_id=p.post_id and s.department_id=d.department_id " +
+			"and ((ss.which_year=? and ss.which_month>=?) or (ss.which_year=? and ss.which_month<=?) or (ss.which_year>? and ss.which_year<?)) " +
+			"order by s.staff_id asc ;";
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1,startyear);
+			preparedStatement.setInt(2,startmonth);
+			preparedStatement.setInt(3,endyear);
+			preparedStatement.setInt(4,endmonth);
+			preparedStatement.setInt(5,startyear);
+			preparedStatement.setInt(6,endyear);
+		}
+		try{
+			resultSet=preparedStatement.executeQuery();
+			
+			while(resultSet.next()){
+				Department department=new Department();
+				department.setDepartmentName(resultSet.getString("d.department_name"));
+				Post post=new Post();
+				post.setPostName(resultSet.getString("p.post_name"));
+				Staff staff=new Staff();
+				staff.setStaffId(resultSet.getInt("s.staff_id"));
+				staff.setStaffName(resultSet.getString("s.staff_name"));
+				staff.setDepartment(department);
+				staff.setPost(post);
+				
+				StaffScore staffScore=new StaffScore();
+				staffScore.setStaff(staff);
+				staffScore.setTotalScore(resultSet.getFloat("ss.staff_score"));
+				staffScore.setInstruction(resultSet.getString("ss.annotation"));
+				staffScore.setYear(resultSet.getInt("ss.which_year"));
+				staffScore.setMonth(resultSet.getInt("ss.which_month"));
+				
+				staffScoreList.add(staffScore);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return staffScoreList;
+	}
+	
+	/**
+	 * 根据所填写的员工ID, year,  month找到对应的得分
+	 */
+	public List<StaffScore> getStaffScore(int staffId, int startyear,int startmonth, int endyear, int endmonth)throws Exception{
+		List<StaffScore> staffScoreList=new ArrayList<StaffScore>();
+		String sql;
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		if(startyear == endyear)
+		{
+			sql = "select s.staff_id,s.staff_name,d.department_name,p.post_name,ss.staff_score,ss.which_year,ss.which_month,ss.annotation " +
+				"from staff s,staff_score ss,department d,post p " +
+				"where ss.staff_id=s.staff_id and s.post_id=p.post_id and s.department_id=d.department_id " +
+				"and ss.staff_id=? and ss.which_year=? and ss.which_month>=? and ss.which_month<=? " +
+				"order by s.staff_id asc ;";
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1,staffId);
+			preparedStatement.setInt(2,startyear);
+			preparedStatement.setInt(3,startmonth);
+			preparedStatement.setInt(4,endmonth);
+			
+		}
+		else
+		{
+			sql="select s.staff_id,s.staff_name,d.department_name,p.post_name,ss.staff_score,ss.which_year,ss.which_month,ss.annotation " +
+			"from staff s,staff_score ss,department d,post p " +
+			"where ss.staff_id=s.staff_id and s.post_id=p.post_id and s.department_id=d.department_id " +
+			"and ss.staff_id=? " +
+			"and ((ss.which_year=? and ss.which_month>=?) or (ss.which_year=? and ss.which_month<=?) or (ss.which_year>? and ss.which_year<?)) " +
+			"order by s.staff_id asc ;";
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1,staffId);
+			preparedStatement.setInt(2,startyear);
+			preparedStatement.setInt(3,startmonth);
+			preparedStatement.setInt(4,endyear);
+			preparedStatement.setInt(5,endmonth);
+			preparedStatement.setInt(6,startyear);
+			preparedStatement.setInt(7,endyear);
+			
+		}
+		
+		
+		
+		
+		try{
+			
+			
+			resultSet=preparedStatement.executeQuery();
+			
+			while(resultSet.next()){
+				Department department=new Department();
+				department.setDepartmentName(resultSet.getString("d.department_name"));
+				Post post=new Post();
+				post.setPostName(resultSet.getString("p.post_name"));
+				Staff staff=new Staff();
+				staff.setStaffId(resultSet.getInt("s.staff_id"));
+				staff.setStaffName(resultSet.getString("s.staff_name"));
+				staff.setDepartment(department);
+				staff.setPost(post);
+				
+				StaffScore staffScore=new StaffScore();
+				staffScore.setStaff(staff);
+				staffScore.setTotalScore(resultSet.getFloat("ss.staff_score"));
+				staffScore.setInstruction(resultSet.getString("ss.annotation"));
+				staffScore.setYear(resultSet.getInt("ss.which_year"));
+				staffScore.setMonth(resultSet.getInt("ss.which_month"));
+				
+				staffScoreList.add(staffScore);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return staffScoreList;
+	}
+	
+
+	
+	public boolean updateStaffScore(int staffScoreId,float staffScore,String instruction)throws Exception{
+		String sql="update staff_score set staff_score=?,annotation=?,score_date=? where staff_score_id=?";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setFloat(1, staffScore);
+			preparedStatement.setString(2, instruction);
+			preparedStatement.setDate(3, new Date(System.currentTimeMillis()));
+			preparedStatement.setInt(4, staffScoreId);
+			
+			preparedStatement.executeUpdate();
+			return true;
+		}catch(Exception e){
+			e.printStackTrace();
+			return false;
+		}finally{
+			DataBaseUtil.close(preparedStatement, connection);
+		}
+	}
+	
+
+
+//===================================================以下为判断是否已经计算过员工得分提供数据支持===========================================================
+	/**
+	 * 查询“员工得分”表中，关于本次员工绩效的数量
+	 */
+	public int getNowStaffScoreQuantity(int year,int month)throws Exception{
+		int count=0;
+		String sql="select count(*) c from staff_score where which_year=? and which_month=?";
+		
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, year);
+			preparedStatement.setInt(2, month);
+			
+			resultSet=preparedStatement.executeQuery();
+			if(resultSet.next()){
+				count=resultSet.getInt("c");
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return count;
+	}
+//==================================================以下为判断是否已经计算过部门得分提供数据支持===========================================================
+	/**
+	 * 获取当前部门绩效结果的数量
+	 * @param year
+	 * @param month
+	 * @return
+	 * @throws Exception
+	 */
+	public int getNowDepartmentScoreQuantity(int year,int month)throws Exception{
+		int count=0;
+		String sql="select count(*) c from department_score where which_year=? and which_month=?";
+		
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, year);
+			preparedStatement.setInt(2, month);
+			
+			resultSet=preparedStatement.executeQuery();
+			if(resultSet.next()){
+				count=resultSet.getInt("c");
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return count;
+	}
+//===================================================在Excel表格中添加一列，工资列=====================================================
+	/**
+	 * 根据员工的员工号，查找到其对应的工资等级
+	 */
+	public float getSalaryByStaffId(int staffId)throws Exception{
+		float salary=0;
+		String sql="select salary from salary where staff_id=?";
+		
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, staffId);
+			
+			resultSet=preparedStatement.executeQuery();
+			
+			if(resultSet.next()){
+				salary=resultSet.getFloat("salary");
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return salary;
+	}
+	
+	public List<Integer> departmentScoredYears() throws Exception
+	{
+		List<Integer> ret = null;
+		String sql="select which_year from department_score group by which_year;";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		connection=DataBaseUtil.getConnection();
+		preparedStatement=connection.prepareStatement(sql);
+		
+		resultSet=preparedStatement.executeQuery();
+		while(resultSet.next())
+		{
+			if(ret == null)
+				ret = new ArrayList<Integer>();
+			ret.add(resultSet.getInt("which_year"));
+		}
+		return ret;
+	}
+	
+	public List<Integer> departmentScoredMonths() throws Exception
+	{
+		List<Integer> ret = null;
+		String sql="select which_month from department_score group by which_month;";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		connection=DataBaseUtil.getConnection();
+		preparedStatement=connection.prepareStatement(sql);
+		
+		resultSet=preparedStatement.executeQuery();
+		while(resultSet.next())
+		{
+			if(ret == null)
+				ret = new ArrayList<Integer>();
+			ret.add(resultSet.getInt("which_month"));
+		}
+		return ret;
+	}
+	
+	public List<Integer> staffScoredYears() throws Exception
+	{
+		List<Integer> ret = null;
+		String sql="select which_year from staff_score group by which_year;";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		connection=DataBaseUtil.getConnection();
+		preparedStatement=connection.prepareStatement(sql);
+		
+		resultSet=preparedStatement.executeQuery();
+		while(resultSet.next())
+		{
+			if(ret == null)
+				ret = new ArrayList<Integer>();
+			ret.add(resultSet.getInt("which_year"));
+		}
+		return ret;
+	}
+	
+	public List<Integer> staffScoredMonths() throws Exception
+	{
+		List<Integer> ret = null;
+		String sql="select which_month from staff_score group by which_month;";
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		connection=DataBaseUtil.getConnection();
+		preparedStatement=connection.prepareStatement(sql);
+		
+		resultSet=preparedStatement.executeQuery();
+		while(resultSet.next())
+		{
+			if(ret == null)
+				ret = new ArrayList<Integer>();
+			ret.add(resultSet.getInt("which_month"));
+		}
+		return ret;
+	}
+}

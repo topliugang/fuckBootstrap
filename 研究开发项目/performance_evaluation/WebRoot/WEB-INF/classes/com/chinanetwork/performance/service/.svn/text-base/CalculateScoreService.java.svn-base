@@ -1,0 +1,749 @@
+package com.chinanetwork.performance.service;
+
+import java.text.DecimalFormat;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+
+import com.chinanetwork.performance.bean.Department;
+import com.chinanetwork.performance.bean.DepartmentScore;
+import com.chinanetwork.performance.bean.DepartmentScoreRecord;
+import com.chinanetwork.performance.bean.Staff;
+import com.chinanetwork.performance.bean.StaffScore;
+import com.chinanetwork.performance.bean.StaffScoreRecord;
+import com.chinanetwork.performance.dao.CalculateScoreDao;
+import com.chinanetwork.performance.dao.GetScoreDao;
+import com.chinanetwork.performance.dao.StaffManageDao;
+import com.chinanetwork.performance.dao.TaskProgressDao;
+import com.chinanetwork.performance.util.ConfigurationDataUtil;
+
+/**
+ * 计算 绩效考评分数 Service
+ * @author Administrator
+ *
+ */
+public class CalculateScoreService {
+	public CalculateScoreDao calculateScoreDao=new CalculateScoreDao();
+	public GetScoreDao getScoreDao=new GetScoreDao();
+//----------------------------------------------------------------------------------------------------------------------部门绩效计算开始
+	public boolean calculateDepartmentScore()throws Exception{
+		try{
+			//计算市公司各部门，各区营业部的部门的得分
+			calculateFirstDepartmentScore();
+			//计算各区营业部的各个科室的部门得分
+			calculateSecondDepartmentScore();
+			return true;
+		}catch(Exception e){
+			return false;
+		}
+	}
+	
+	public boolean calculateStaffScore(){
+		try{
+			List<Staff> staffList=null;
+			StaffManageDao staffManageDao = new StaffManageDao();
+			staffList=staffManageDao.getAllStaff();
+			
+			List<StaffScore> staffScoreList=new ArrayList<StaffScore>();
+			
+			List<Staff> postAStaffList=new ArrayList<Staff>(); 		//副总经理List
+			List<Staff> postBStaffList=new ArrayList<Staff>(); 		//市公司部门主任List
+			List<Staff> postCStaffList=new ArrayList<Staff>(); 		//市公司部门副主任,市公司员工,区营业部科室副科长,区营业部科员工List
+			List<Staff> postDStaffList=new ArrayList<Staff>(); 		//区营业部经理List
+			List<Staff> postEStaffList=new ArrayList<Staff>(); 		//区营业部副经理List
+			List<Staff> postFStaffList=new ArrayList<Staff>();		//区营业部科室科长List
+			List<Staff> postGStaffList=new ArrayList<Staff>();		//总经理List
+			
+			for(int i=0;i<staffList.size();i++){
+				Staff staff=staffList.get(i);
+				String postName=staff.getPost().getPostName();
+				if(postName.equals("副总经理")){
+					postAStaffList.add(staff);
+				}else if(postName.equals("市公司部门主任")){
+					postBStaffList.add(staff);
+				}else if(postName.equals("市公司部门副主任")||postName.equals("市公司员工")||
+						postName.equals("区营业部科室副科长")||postName.equals("区营业部科员工")){
+					postCStaffList.add(staff);
+				}else if(postName.equals("区营业部经理")){
+					postDStaffList.add(staff);
+				}else if(postName.equals("区营业部副经理")){
+					postEStaffList.add(staff);
+				}else if(postName.equals("区营业部科室科长")){
+					postFStaffList.add(staff);
+				}else if(postName.equals("总经理")){
+					postGStaffList.add(staff);
+				}
+				staffList.remove(staff);
+				i--;
+			}
+			
+			List<StaffScore> postAStaffScoreList=new ArrayList<StaffScore>(); 		//副总经理List
+			List<StaffScore> postBStaffScoreList=new ArrayList<StaffScore>(); 		//市公司部门主任List
+			List<StaffScore> postCStaffScoreList=new ArrayList<StaffScore>(); 		//市公司部门副主任,市公司员工,区营业部科室副科长,区营业部科员工List
+			List<StaffScore> postDStaffScoreList=new ArrayList<StaffScore>(); 		//区营业部经理List
+			List<StaffScore> postEStaffScoreList=new ArrayList<StaffScore>(); 		//区营业部副经理List
+			List<StaffScore> postFStaffScoreList=new ArrayList<StaffScore>();		//区营业部科室科长List
+			List<StaffScore> postGStaffScoreList=new ArrayList<StaffScore>();		//总经理List
+			
+			postAStaffScoreList=calculateTheScoreOfDeputyManager(postAStaffList);
+			postBStaffScoreList=calculateTheScoreOfChief(postBStaffList);
+			postCStaffScoreList=calculateTheScoreOfDeputyDirectorOrDepEmpOrDeputyChiefOrClerk (postCStaffList);
+			postDStaffScoreList=calculateTheScoreOfSalesManager(postDStaffList);
+			postEStaffScoreList=calculateTheScoreOfSalesDeputyManager(postEStaffList);
+			postFStaffScoreList=calculateTheScoreOfDirector(postFStaffList);
+			postGStaffScoreList=calculateLastStaffScore(postGStaffList,postAStaffScoreList);
+			
+			staffScoreList.addAll(postAStaffScoreList);
+			staffScoreList.addAll(postBStaffScoreList);
+			staffScoreList.addAll(postCStaffScoreList);
+			staffScoreList.addAll(postDStaffScoreList);
+			staffScoreList.addAll(postEStaffScoreList);
+			staffScoreList.addAll(postFStaffScoreList);
+			staffScoreList.addAll(postGStaffScoreList);
+			
+			calculateScoreDao.insertDataIntoStaffScore(staffScoreList);
+			
+			return true;
+		}catch(Exception e){
+			e.printStackTrace();
+			return false;
+		}
+	}
+	/**
+	 * First：市公司各部门，各区营业部的部门得分
+	 * @throws Exception
+	 */
+	@SuppressWarnings("unchecked")
+	private void calculateFirstDepartmentScore()throws Exception{
+		try{
+			//long startTime=ConfigurationDataUtil.getLongVlaue("start_time");
+			//long endTime=ConfigurationDataUtil.getLongVlaue("end_time");
+			int year=ConfigurationDataUtil.getIntegerVlaue("which_year");
+			int month=ConfigurationDataUtil.getIntegerVlaue("which_month");
+			List<Department> departmentList=calculateScoreDao.selectFirstClassDepartmentList();
+			
+			for(int i=0;i<departmentList.size();i++){
+				Department department=departmentList.get(i);
+				System.out.println(department.getDepartmentName()+":");
+				List<DepartmentScoreRecord> departmentScoreRecordList=calculateScoreDao.selectAllDepartmentScoreRecordByDepartment(department, year, month);
+				Map<Integer,List<DepartmentScoreRecord>> departmentScoreRecordMap=new HashMap<Integer,List<DepartmentScoreRecord>>();
+				for(int j=0;j<departmentScoreRecordList.size();j++){
+					DepartmentScoreRecord departmentScoreRecord=departmentScoreRecordList.get(j);
+					//去掉无效得分
+					if(departmentScoreRecord.getScore() < 0)
+						continue;
+					if(!departmentScoreRecordMap.containsKey(departmentScoreRecord.getDepartmentScoreItem().getDepartmentScoredItemId())){
+						List<DepartmentScoreRecord> depScoreRecordList=new ArrayList<DepartmentScoreRecord>();
+						depScoreRecordList.add(departmentScoreRecord);
+						departmentScoreRecordMap.put(departmentScoreRecord.getDepartmentScoreItem().getDepartmentScoredItemId(), depScoreRecordList);
+					}else{
+						departmentScoreRecordMap.get(departmentScoreRecord.getDepartmentScoreItem().getDepartmentScoredItemId()).add(departmentScoreRecord);
+					}
+				}
+				Map<Integer,Float> departmentItemScoreMap=new HashMap<Integer,Float>();
+				
+				Iterator iterator=departmentScoreRecordMap.keySet().iterator();
+				String explain="";//打分说明
+				while(iterator.hasNext()){
+					Integer key;
+					key=(Integer)iterator.next();
+					System.out.println("条目编号："+key);
+					float score=0;
+					List<DepartmentScoreRecord> dsRecordList=departmentScoreRecordMap.get(key);
+					for(int z=0;z<dsRecordList.size();z++){
+						score=score+dsRecordList.get(z).getScore();
+						System.out.println(dsRecordList.get(z).getScore());
+						if(dsRecordList.get(z).getScoreComment()!=null&&(!dsRecordList.get(z).getScoreComment().equals(""))){
+							explain=explain+dsRecordList.get(z).getScoreComment()+";";
+						}
+					}
+					score=score/dsRecordList.size();
+					System.out.println("条目总分："+score);
+					departmentItemScoreMap.put(key, score);
+				}
+				
+				float departmentTotalScore=0;
+				iterator=departmentItemScoreMap.keySet().iterator();
+				while(iterator.hasNext()){
+					Integer key;
+					key=(Integer)iterator.next();
+					departmentTotalScore=departmentTotalScore+departmentItemScoreMap.get(key);
+				}
+				
+				DecimalFormat df = new DecimalFormat("#.00");
+				departmentTotalScore=Float.parseFloat(df.format(departmentTotalScore));
+				getScoreDao.insertDepartmentScore(department, departmentTotalScore, year, month,explain);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}
+	}
+	/**
+	 * Second：各区营业部各科室的部门得分
+	 * @throws Exception
+	 */
+	@SuppressWarnings("unchecked")
+	private void calculateSecondDepartmentScore()throws Exception{
+		System.out.println("科室算分开始");
+		try{
+			int year=ConfigurationDataUtil.getIntegerVlaue("which_year");
+			int month=ConfigurationDataUtil.getIntegerVlaue("which_month");
+			List<Department> departmentList=calculateScoreDao.selectSecondClassDepartmentList();
+			for(int i=0;i<departmentList.size();i++){
+				System.out.println(departmentList.get(i).getDepartmentName());
+			}
+			for(int i=0;i<departmentList.size();i++){
+				Department department=departmentList.get(i);
+				
+				if(department.getDepartmentId() == 101)
+				{
+					int a = 0;
+					int b = a++;
+				}
+				Map<Department,List<DepartmentScoreRecord>> departmentScoreRecordMap=new HashMap<Department,List<DepartmentScoreRecord>>();
+				List<DepartmentScoreRecord> departmentScoreRecordList=calculateScoreDao.selectAllDepartmentScoreRecordByDepartment(department, year, month);
+				for(int j=0;j<departmentScoreRecordList.size();j++){
+					DepartmentScoreRecord departmentScoreRecord=departmentScoreRecordList.get(j);
+					//去掉无效得分
+					if(departmentScoreRecord.getScore() < 0)
+						continue;
+					if(departmentScoreRecordMap.get(departmentScoreRecord.getDepartmentFrom())==null){
+						List<DepartmentScoreRecord> dsRecordList=new ArrayList<DepartmentScoreRecord>();
+						dsRecordList.add(departmentScoreRecord);
+						departmentScoreRecordMap.put(departmentScoreRecord.getDepartmentFrom(), dsRecordList);
+					}else if(departmentScoreRecordMap.get(departmentScoreRecord.getDepartmentFrom())!=null){
+						departmentScoreRecordMap.get(departmentScoreRecord.getDepartmentFrom()).add(departmentScoreRecord);
+					}
+				}
+				
+				Map<Department,Float> departmentScoreMap=new HashMap<Department,Float>();
+				
+				Iterator iterator=departmentScoreRecordMap.keySet().iterator();
+				String explain="";//打分说明
+				while(iterator.hasNext()){
+					Department departmentKey=(Department)iterator.next();
+					List<DepartmentScoreRecord> dsRecordList=departmentScoreRecordMap.get(departmentKey);
+					float score=0;
+					for(int j=0;j<dsRecordList.size();j++){
+						score=score+dsRecordList.get(j).getScore();
+						if(dsRecordList.get(j).getScoreComment()!=null&&(!dsRecordList.get(j).getScoreComment().equals(""))){
+							explain=explain+dsRecordList.get(j).getScoreComment()+";";
+						}
+					}
+					departmentScoreMap.put(departmentKey, score);
+				}
+				
+				iterator=departmentScoreMap.keySet().iterator();
+				float departmentTotalScore=0;
+				
+				///副经理70%  经理30%
+				if(departmentScoreMap.size() == 1)
+				{
+					Department departmentKey = (Department) iterator.next();
+					departmentTotalScore = (float)departmentScoreMap.get(departmentKey);
+				}
+				else{
+					while (iterator.hasNext()) {
+						Department departmentKey = (Department) iterator.next();
+						if (departmentKey.getDepartmentId() == department
+								.getHigherDepartmentId()) {
+							float s = departmentScoreMap.get(departmentKey);
+							departmentTotalScore = departmentTotalScore
+									+ (float) (s * 0.7);
+						} else {
+							float s = departmentScoreMap.get(departmentKey);
+							departmentTotalScore = departmentTotalScore
+									+ (float) (s * 0.3);
+						}
+					}
+				}
+				DecimalFormat df = new DecimalFormat("#.00");
+				departmentTotalScore=Float.parseFloat(df.format(departmentTotalScore));
+				getScoreDao.insertDepartmentScore(department, departmentTotalScore, year, month,explain);
+			}
+			System.out.println("科室算分结束");
+		}catch(Exception e){
+			e.printStackTrace();
+		}
+	}
+	
+	public List<DepartmentScore> getDepartmentScoreList()throws Exception{
+		int year=ConfigurationDataUtil.getIntegerVlaue("which_year");
+		int month=ConfigurationDataUtil.getIntegerVlaue("which_month");
+		return calculateScoreDao.selectDepartmentScoreList(year, month);
+	}
+//--------------------------------------------------------------------------------------------------------------------------------部门绩效计算结束	
+	
+	
+	
+	
+//--------------------------------------------------------------------------------------------------------------------------------员工算分开始
+	/**
+	 * 计算市公司各部门副主任和员工，以及各区营业部的各个科室副科长和科员的绩效考评分数
+	 * @param staffList		市公司各部门副主任和员工，以及各区营业部的各个科室副科长和科员的集合列表
+	 * @return staffScoreList	员工绩效考评分数集合列表  
+	 * @throws Exception
+	 */
+	private List<StaffScore> calculateTheScoreOfDeputyDirectorOrDepEmpOrDeputyChiefOrClerk (List<Staff> staffList)throws Exception{
+		System.out.println("-----------------------------------------------------------------------------------------------");
+		System.out.println();
+		System.out.println("员工算分开始");
+		try{
+			int year=ConfigurationDataUtil.getIntegerVlaue("which_year");
+			int month=ConfigurationDataUtil.getIntegerVlaue("which_month");
+			List<StaffScore> staffScoreList=new ArrayList<StaffScore>();
+			for(int z=0;z<staffList.size();z++){
+				Staff staff=staffList.get(z);
+				System.out.println("员工名称："+staff.getStaffName());
+				Map<Staff,List<StaffScoreRecord>> staffScoreRecordMap=new HashMap<Staff,List<StaffScoreRecord>>();
+				List<StaffScoreRecord> staffScoreRecordList=calculateScoreDao.selectAllStaffScoreRecordByStaff(staff, year, month);
+				for(int i=0;i<staffScoreRecordList.size();i++){
+					StaffScoreRecord staffScoreRecord=staffScoreRecordList.get(i);
+					Staff fStaff=staffScoreRecord.getScoredFromStaff();
+					if(!staffScoreRecordMap.containsKey(fStaff)){
+						List<StaffScoreRecord> staffScoredRecordFromList=new ArrayList<StaffScoreRecord>();
+						staffScoredRecordFromList.add(staffScoreRecord);
+						staffScoreRecordMap.put(fStaff, staffScoredRecordFromList);
+					}else{
+						staffScoreRecordMap.get(fStaff).add(staffScoreRecord);
+					}
+				}
+				
+				Map<Staff,Float> staffScoreMap=new HashMap<Staff,Float>();
+				
+				Iterator iterator=staffScoreRecordMap.keySet().iterator();
+				String explain="";//打分说明
+				while(iterator.hasNext()){
+					Staff staffKey=(Staff)iterator.next();
+					float totalScore=0;
+					List<StaffScoreRecord> ssRecordList=staffScoreRecordMap.get(staffKey);
+					//System.out.println(ssRecordList);
+					for(int i=0;i<ssRecordList.size();i++){
+						totalScore=totalScore+ssRecordList.get(i).getScore()*ssRecordList.get(i).getStaffScoreItem().getScoreWeight();
+					}
+					staffScoreMap.put(staffKey, totalScore);
+				}
+				
+				String postName=staff.getPost().getPostName();
+				
+				if(staff.getStaffName().equals("王伟"))
+				{
+					int sb = 1;
+					sb++;
+				}
+				
+				float totalScore=0;
+				if(postName.equals("市公司部门副主任")){
+					totalScore=calculateStaff(staff,staffScoreMap,year,month,"副总经理","市公司部门主任",0.3f,0.7f,0.5f,0.5f);
+				}else if(postName.equals("市公司员工")){
+					totalScore=calculateStaff(staff,staffScoreMap,year,month,"市公司部门主任","市公司部门副主任",0.7f,0.3f,0.7f,0.3f);
+				}else if(postName.equals("区营业部科室副科长")){
+					totalScore=calculateStaff(staff,staffScoreMap,year,month,"区营业部副经理","区营业部科室科长",0.3f,0.7f,0.5f,0.5f);
+				}else if(postName.equals("区营业部科员工")){
+					totalScore=calculateStaff(staff,staffScoreMap,year,month,"区营业部科室副科长","区营业部科室科长",0.3f,0.7f,0.7f,0.3f);
+				}
+				DecimalFormat df = new DecimalFormat("#.00");
+				totalScore=Float.parseFloat(df.format(totalScore));
+				StaffScore staffScore=new StaffScore();
+				staffScore.setStaff(staff);
+				staffScore.setTotalScore(totalScore);
+				staffScore.setYear(year);
+				staffScore.setMonth(month);
+				staffScore.setInstruction("");
+				staffScoreList.add(staffScore);
+			}
+			System.out.println("员工算分结束");
+			return staffScoreList;
+		}catch(Exception e){
+			e.printStackTrace();
+			return null;
+		}
+	} 
+	/**
+	 * 市公司各部门副主任和员工，以及各区营业部的各个科室副科长和科员的绩效考评的计算公式
+	 * @param staff											被打分的员工
+	 * @param staffScoreMap						员工各项评分细则的得分Map，以打分者的职位不同分类
+	 * @param year											绩效考评年份
+	 * @param month										绩效考评月份
+	 * @param fStaffA										公式参数，A打分员工的职位名称
+	 * @param fStaffB										公式参数，B打分员工的职位名称
+	 * @param coefficientA							公式参数，A打分员工对应的权重
+	 * @param coefficientB							公式参数，B打分员工对应的权重
+	 * @param staffScoreCoefficient			公式参数，员工评分得分所占的权重
+	 * @param depScoreCoefficient			公式参数，员工所属的部门得分所占的权重
+	 * @return totalScore								返回根据公式计算出的分数
+	 * @throws Exception
+	 */
+	private float calculateStaff(Staff staff,Map<Staff,Float> staffScoreMap,int year,int month,String fStaffA,String fStaffB,float coefficientA,float coefficientB,float staffScoreCoefficient,float depScoreCoefficient)throws Exception{
+		float totalScore=0;
+		if(staff.getStaffName().equals("高丽丽"))
+		{
+			System.out.println("gaoll");
+			
+		}
+		Iterator iterator=staffScoreMap.keySet().iterator();
+		
+		List<Float> scoreListA = new ArrayList<Float>();
+		List<Float> scoreListB = new ArrayList<Float>();
+		while(iterator.hasNext()){
+			Staff staffKey=(Staff)iterator.next();
+			System.out.println("打分员工名称："+staffKey.getStaffName());
+			System.out.println("所打分数："+staffScoreMap.get(staffKey));
+			if(staffKey.getPost().getPostName().equals(fStaffA)){
+				scoreListA.add(staffScoreMap.get(staffKey));
+				//totalScore=totalScore+(float)(staffScoreMap.get(staffKey)*coefficientA);
+			}else if(staffKey.getPost().getPostName().equals(fStaffB)){
+				//totalScore=totalScore+(float)(staffScoreMap.get(staffKey)*coefficientB);
+				scoreListB.add(staffScoreMap.get(staffKey));
+			}
+			float totalA = 0;
+			float totalB = 0;
+			for (int i=0; i<scoreListA.size(); i++)
+				totalA += scoreListA.get(i);
+			for (int i=0; i<scoreListB.size(); i++)
+				totalB += scoreListB.get(i);
+			totalA = totalA/scoreListA.size();
+			totalB = totalB/scoreListB.size();
+			totalScore = coefficientA*totalA + coefficientB*totalB;
+		}
+		DepartmentScore departmentScore=calculateScoreDao.getScoreOfDepartmentBelongStaff(staff.getDepartment().getDepartmentId(), year, month);
+		System.out.println("所属部门："+departmentScore.getDepartment().getDepartmentName());
+		System.out.println("所属部门分数："+departmentScore.getScore());
+		totalScore=totalScore* staffScoreCoefficient+departmentScore.getScore()*depScoreCoefficient;
+		return totalScore;
+	}
+//--------------------------------------------------------------------------------------------------------------------------------员工算分结束
+	
+
+//--------------------------------------------------------------------------------------------------------------------------------部室主任算分开始
+	/**
+	 * 计算市公司各部门主任的绩效考评得分
+	 * @param staffList	市公司各部门主任列表
+	 * @return staffScoreList	市公司各部门主任的得分列表
+	 * @throws Exception
+	 */
+	private List<StaffScore> calculateTheScoreOfChief(List<Staff> staffList)throws Exception{
+		System.out.println("-------------------------------------------------------------------------------------------------");
+		System.out.println("部室主任计算分数开始");
+		int year=ConfigurationDataUtil.getIntegerVlaue("which_year");
+		int month=ConfigurationDataUtil.getIntegerVlaue("which_month");
+		List<StaffScore> staffScoreList=new ArrayList<StaffScore>();
+		for(int i=0;i<staffList.size();i++){
+			Staff staff=staffList.get(i);
+			System.out.println("主任名称："+staff.getStaffName());
+			float totalScore=0;
+			
+			//float task=calculateScoreDao.selectTaskSchedule(year, month);
+			float task = new TaskProgressDao().getTaskProgress(year, month).getTaskProgress();
+			//task=task*100;
+			System.out.println("任务进度："+task);
+			String explain="";//打分说明
+			DepartmentScore departmentScore=calculateScoreDao.getScoreOfDepartmentBelongStaff(staff.getDepartment().getDepartmentId(), year, month);
+			System.out.println("部室名称："+staff.getDepartment().getDepartmentName());
+			System.out.println("部室得分："+departmentScore.getScore());
+			if(departmentScore.getInstruction()!=null&&(!departmentScore.getInstruction().equals(""))){
+				explain=explain+departmentScore.getInstruction();
+			}
+			System.out.println("部室性质："+departmentScore.getDepartment().getNature());
+			if(departmentScore.getDepartment().getNature()==0){
+				totalScore=task*0.7f+departmentScore.getScore()*0.3f;
+			}else if(departmentScore.getDepartment().getNature()==1){
+				totalScore=task*0.2f+departmentScore.getScore()*0.8f;
+			}
+			System.out.println("最后得分："+totalScore);
+			DecimalFormat df = new DecimalFormat("#.00");
+			totalScore=Float.parseFloat(df.format(totalScore));
+			StaffScore staffScore=new StaffScore();
+			staffScore.setStaff(staff);
+			staffScore.setTotalScore(totalScore);
+			staffScore.setYear(year);
+			staffScore.setMonth(month);
+			staffScore.setInstruction(explain);
+			staffScoreList.add(staffScore);
+		}
+		System.out.println("部室主任计算分数结束");
+		return staffScoreList;
+	}
+//--------------------------------------------------------------------------------------------------------------------------------部室主任算分结束
+	
+//--------------------------------------------------------------------------------------------------------------------------------营业部科长算分开始
+	/**
+	 * 各区营业部各科室科长绩效考评分数计算
+	 * @param staffList 	各区营业部各科室科长列表
+	 * @return staffScoreList 	各区营业部各科室科长得分列表
+	 * @throws Exception
+	 */
+	private List<StaffScore> calculateTheScoreOfDirector(List<Staff> staffList)throws Exception{
+		System.out.println("--------------------------------------------------------------------------------------------");
+		System.out.println();
+		System.out.println("区营业部科室科长算分开始");
+		int year=ConfigurationDataUtil.getIntegerVlaue("which_year");
+		int month=ConfigurationDataUtil.getIntegerVlaue("which_month");
+		List<StaffScore> staffScoreList=new ArrayList<StaffScore>();
+		for(int i=0;i<staffList.size();i++){
+			Staff staff=staffList.get(i);
+			System.out.println("科长名称："+staff.getStaffName());
+			float totalScore=0;
+			String explain="";//打分说明
+			if(staff.getStaffId() == 101)
+			{
+				System.out.println("hehe");
+				System.out.println("youcuole");
+			}
+			DepartmentScore departmentScore=calculateScoreDao.getScoreOfDepartmentBelongStaff(staff.getDepartment().getDepartmentId(), year, month);
+			
+			
+			if(departmentScore.getDepartment().getDepartmentName() == null)
+			{
+				System.out.println("cao");
+				System.out.println(staff.getStaffId());
+			}
+			
+			
+			System.out.println("所属科室："+departmentScore.getDepartment().getDepartmentName());
+			System.out.println("得分："+departmentScore.getScore());
+			DepartmentScore salesDepartmentScore=calculateScoreDao.getScoreOfDepartmentBelongStaff(calculateScoreDao.selectSalesDepartmentByDepartment(staff, year, month).getDepartmentId(), year, month);
+			System.out.println("所属营业部："+salesDepartmentScore.getDepartment().getDepartmentName());
+			System.out.println("得分："+salesDepartmentScore.getScore());
+			if(departmentScore.getInstruction()!=null&&(!departmentScore.getInstruction().equals(""))){
+				explain=explain+departmentScore.getInstruction();
+			}
+			if(salesDepartmentScore.getInstruction()!=null&&(!salesDepartmentScore.getInstruction().equals(""))){
+				explain=explain+salesDepartmentScore.getInstruction();
+			}
+			totalScore=salesDepartmentScore.getScore()*0.2f+departmentScore.getScore()*0.8f;
+			System.out.println("科长最后得分："+totalScore);
+			DecimalFormat df = new DecimalFormat("#.00");
+			totalScore=Float.parseFloat(df.format(totalScore));
+			StaffScore staffScore=new StaffScore();
+			staffScore.setStaff(staff);
+			staffScore.setTotalScore(totalScore);
+			staffScore.setYear(year);
+			staffScore.setMonth(month);
+			staffScore.setInstruction(explain);
+			staffScoreList.add(staffScore);
+		}
+		return staffScoreList;
+	}
+//--------------------------------------------------------------------------------------------------------------------------营业部科长算分结束
+	
+//--------------------------------------------------------------------------------------------------------------------------营业部经理算分开始
+	/**
+	 * 各区营业部经理绩效考评分数计算
+	 * @param staffList	各区营业部经理列表
+	 * @return	staffScoreList 各区营业部经理得分列表
+	 * @throws Exception
+	 */
+	private List<StaffScore> calculateTheScoreOfSalesManager(List<Staff> staffList)throws Exception{
+		System.out.println("---------------------------------------------------------------------------------------------");
+		System.out.println();
+		System.out.println("区营业部经理算分开始");
+		int year=ConfigurationDataUtil.getIntegerVlaue("which_year");
+		int month=ConfigurationDataUtil.getIntegerVlaue("which_month");
+		List<StaffScore> staffScoreList=new ArrayList<StaffScore>();
+		for(int i=0;i<staffList.size();i++){
+			Staff staff=staffList.get(i);
+			System.out.println("营业部经理名称："+staff.getStaffName());
+			float totalScore=0;
+			String explain="";//打分说明
+			DepartmentScore departmentScore=calculateScoreDao.getScoreOfDepartmentBelongStaff(staff.getDepartment().getDepartmentId(), year, month);
+			System.out.println("所属营业部："+departmentScore.getDepartment().getDepartmentName());
+			System.out.println("所属营业部得分："+departmentScore.getScore());
+			if(departmentScore.getInstruction()!=null&&(!departmentScore.getInstruction().equals(""))){
+				explain=explain+departmentScore.getInstruction();
+			}
+			totalScore=departmentScore.getScore();
+			System.out.println("营业部经理总得分："+totalScore);
+			DecimalFormat df = new DecimalFormat("#.00");
+			totalScore=Float.parseFloat(df.format(totalScore));
+			StaffScore staffScore=new StaffScore();
+			staffScore.setStaff(staff);
+			staffScore.setTotalScore(totalScore);
+			staffScore.setYear(year);
+			staffScore.setMonth(month);
+			staffScore.setInstruction(explain);
+			staffScoreList.add(staffScore);
+		}
+		System.out.println("区营业部经理算分结束");
+		return staffScoreList;
+	}
+//----------------------------------------------------------------------------------------------------------------------------营业部经理算分开始
+/**
+ *	各区营业部副经理绩效考评分数计算 
+ * @param staffList	各区营业部副经理列表
+ * @return	staffScoreList 各区营业部副经理得分列表
+ * @throws Exception
+ */
+	private List<StaffScore> calculateTheScoreOfSalesDeputyManager(List<Staff> staffList)throws Exception{
+		System.out.println("---------------------------------------------------------------------------------------------");
+		System.out.println();
+		System.out.println("区营业部副经理算分开始");
+		int year=ConfigurationDataUtil.getIntegerVlaue("which_year");
+		int month=ConfigurationDataUtil.getIntegerVlaue("which_month");
+		List<StaffScore> staffScoreList=new ArrayList<StaffScore>();
+		for(int i=0;i<staffList.size();i++){
+			Staff staff=staffList.get(i);
+			System.out.println("营业部副经理名称："+staff.getStaffName());
+			float totalScore=0;
+			String explain="";//打分说明
+			DepartmentScore departmentScore=calculateScoreDao.getScoreOfDepartmentBelongStaff(staff.getDepartment().getHigherDepartmentId(), year, month);
+			System.out.println("所属营业部："+departmentScore.getDepartment().getDepartmentName());
+			System.out.println("所属营业部得分："+departmentScore.getScore());
+			if(departmentScore.getInstruction()!=null&&(!departmentScore.getInstruction().equals(""))){
+				explain=explain+departmentScore.getInstruction();
+			}
+			totalScore=departmentScore.getScore();
+			System.out.println("营业部副经理总得分："+totalScore);
+			DecimalFormat df = new DecimalFormat("#.00");
+			totalScore=Float.parseFloat(df.format(totalScore));
+			StaffScore staffScore=new StaffScore();
+			staffScore.setStaff(staff);
+			staffScore.setTotalScore(totalScore);
+			staffScore.setYear(year);
+			staffScore.setMonth(month);
+			staffScore.setInstruction(explain);
+			staffScoreList.add(staffScore);
+		}
+		System.out.println("区营业部副经理算分结束");
+		return staffScoreList;
+	}
+//-----------------------------------------------------------------------------------------------------------------------------营业部副经理算分结束
+	
+//-----------------------------------------------------------------------------------------------------------------------------分管副总算分开始
+	/**
+	 * 分管副总绩效考评得分计算
+	 * @param staffList	分管副总列表
+	 * @return staffScoreList 分管副总得分列表
+	 * @throws Exception
+	 */
+	private List<StaffScore> calculateTheScoreOfDeputyManager(List<Staff> staffList)throws Exception{
+		System.out.println("-----------------------------------------------------------------------------------");
+		System.out.println("分管副总算分开始");
+		int year=ConfigurationDataUtil.getIntegerVlaue("which_year");
+		int month=ConfigurationDataUtil.getIntegerVlaue("which_month");
+		
+		List<StaffScore> staffScoreList=new ArrayList<StaffScore>();
+		for(int i=0;i<staffList.size();i++){
+			Staff staff=staffList.get(i);
+			System.out.println("分管副总名称："+staff.getStaffName());
+			float totalScore=0;
+			String explain="";//打分说明
+			List<DepartmentScore> departmentScoreList=
+				calculateScoreDao.selectDepartmentScoreBeManaged(staff.getDepartment().getDepartmentId(), year, month);
+			if(departmentScoreList.size()==1){
+				System.out.println("分管部门名称："+departmentScoreList.get(0).getDepartment().getDepartmentName());
+				System.out.println("分管部门分数："+departmentScoreList.get(0).getScore());
+				totalScore=departmentScoreList.get(0).getScore();
+				if(departmentScoreList.get(0).getInstruction()!=null&&(!departmentScoreList.get(0).equals(""))){
+					explain=explain+departmentScoreList.get(0).getInstruction();
+				}
+			}else if(departmentScoreList.size()>1){
+				List<DepartmentScore> createIncomeDepartmentScoreList=new ArrayList<DepartmentScore>();
+				List<DepartmentScore> noCreateIncomeDepartmentScoreList=new ArrayList<DepartmentScore>();
+				for(int j=0;j<departmentScoreList.size();j++){
+					if(departmentScoreList.get(j).getInstruction()!=null&&(!departmentScoreList.get(j).equals(""))){
+						explain=explain+departmentScoreList.get(j).getInstruction();
+					}
+					if(departmentScoreList.get(j).getDepartment().getNature()==0){
+						createIncomeDepartmentScoreList.add(departmentScoreList.get(j));
+					}
+					if(departmentScoreList.get(j).getDepartment().getNature()==1){
+						noCreateIncomeDepartmentScoreList.add(departmentScoreList.get(j));
+					}
+				}
+				float incomeScore=0;
+				if(createIncomeDepartmentScoreList.size()!=0){
+					for(int j=0;j<createIncomeDepartmentScoreList.size();j++){
+						System.out.println("创收部门名称："+createIncomeDepartmentScoreList.get(j).getDepartment().getDepartmentName());
+						System.out.println("部门得分："+createIncomeDepartmentScoreList.get(j).getScore());
+						incomeScore=incomeScore+createIncomeDepartmentScoreList.get(j).getScore();
+					}
+					System.out.println("创收部门总分数："+incomeScore);
+					incomeScore=incomeScore/createIncomeDepartmentScoreList.size();
+					System.out.println("创收部门最后分数："+incomeScore);
+				}
+				float noIncomeScore=0;
+				if(noCreateIncomeDepartmentScoreList.size()!=0){
+					for(int j=0;j<noCreateIncomeDepartmentScoreList.size();j++){
+						System.out.println("非创收部门名称："+noCreateIncomeDepartmentScoreList.get(j).getDepartment().getDepartmentName());
+						System.out.println("得分："+noCreateIncomeDepartmentScoreList.get(j).getScore());
+						noIncomeScore=noIncomeScore+noCreateIncomeDepartmentScoreList.get(j).getScore();
+					}
+					System.out.println("非创收部门总分数："+noIncomeScore);
+					noIncomeScore=noIncomeScore/noCreateIncomeDepartmentScoreList.size();
+					System.out.println("非创收部门最后分数："+noIncomeScore);
+				}
+				if(incomeScore==0){
+					totalScore=noIncomeScore;
+				}else{
+					if(noIncomeScore==0){
+						totalScore=incomeScore;
+					}else{
+						totalScore=incomeScore*0.7f+noIncomeScore*0.3f;
+					}
+				}
+			}
+			DecimalFormat df = new DecimalFormat("#.00");
+			totalScore=Float.parseFloat(df.format(totalScore));
+			StaffScore staffScore=new StaffScore();
+			staffScore.setStaff(staff);
+			staffScore.setTotalScore(totalScore);
+			staffScore.setYear(year);
+			staffScore.setMonth(month);
+			staffScore.setInstruction(explain);
+			staffScoreList.add(staffScore);
+			System.out.println("分管副总最后得分："+totalScore);
+			System.out.println();
+		}
+		System.out.println("分管副总算分结束");
+		return staffScoreList;
+	}
+//-----------------------------------------------------------------------------------------------------------------------分管副总算分结束
+	
+//-----------------------------------------------------------------------------------------------------------------------总经理算分开始
+	/**
+	 * 总经理绩效考评分数计算
+	 * @param staffList	总经理列表
+	 * @param staffScoreList		总经理得分列表
+	 * @return
+	 * @throws Exception
+	 */
+	private List<StaffScore> calculateLastStaffScore(List<Staff> staffList,List<StaffScore> staffScoreList)throws Exception{
+		System.out.println("--------------------------------------------------------------------------------------------");
+		System.out.println("总经理算分开始");
+		System.out.println();
+		int year=ConfigurationDataUtil.getIntegerVlaue("which_year");
+		int month=ConfigurationDataUtil.getIntegerVlaue("which_month");
+		List<StaffScore> sScoreList=new ArrayList<StaffScore>();
+		Staff staff=staffList.get(0);
+		System.out.println("总经理名称："+staff.getStaffName());
+		float totalScore=0;
+		String explain="";
+		for(int i=0;i<staffScoreList.size();i++){
+			StaffScore staffScore=staffScoreList.get(i);
+			System.out.println("分管副总名称："+staffScore.getStaff().getStaffName());
+			System.out.println("分管副总分数："+staffScore.getTotalScore());
+			totalScore=totalScore+staffScore.getTotalScore();
+			if(staffScoreList.get(i).getInstruction()!=null&&(!staffScoreList.get(i).getInstruction().equals(""))){
+				explain=explain+staffScoreList.get(i).getInstruction();
+			}
+		}
+		System.out.println("分管副总总得分："+totalScore);
+		totalScore=totalScore/staffScoreList.size();
+		DecimalFormat df = new DecimalFormat("#.00");
+		totalScore=Float.parseFloat(df.format(totalScore));
+		System.out.println("总经理最后得分："+totalScore);
+		StaffScore staffScore=new StaffScore();
+		staffScore.setStaff(staff);
+		staffScore.setTotalScore(totalScore);
+		staffScore.setYear(year);
+		staffScore.setMonth(month);
+		staffScore.setInstruction(explain);
+		staffScoreList.add(staffScore);
+		System.out.println("总经理算分结束");
+		return sScoreList;
+	}
+//--------------------------------------------------------------------------------------------------------------------------------总经理算分结束
+}

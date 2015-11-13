@@ -1,0 +1,277 @@
+package com.chinanetwork.performance.web.action;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.sql.Date;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.List;
+
+import jxl.Workbook;
+import jxl.write.WritableSheet;
+import jxl.write.WritableWorkbook;
+
+import com.chinanetwork.performance.bean.DepartmentScore;
+import com.chinanetwork.performance.bean.StaffScore;
+import com.chinanetwork.performance.service.CalculateScoreService;
+import com.chinanetwork.performance.service.GetScoreService;
+import com.chinanetwork.performance.util.ConfigurationDataUtil;
+
+/**
+ * 主要负责部门计算分数 、查看部门分数
+ * 	以及
+ * 员工计算分数，和查看员工分数
+ * @author Administrator
+ *
+ */
+public class GetScoreAction {
+	
+	private GetScoreService getScoreService=new GetScoreService();
+	private CalculateScoreService calculateScoreService=new CalculateScoreService();
+	
+	private List<String> messageList;		//负责在失败页面，显示部门评分未完成的细节
+	private List<DepartmentScore> departmentScoreList;	//算分结束后，显示页面中显示所有互评部门的分数
+	
+	public List<DepartmentScore> getDepartmentScoreList() {
+		return departmentScoreList;
+	}
+
+	public void setDepartmentScoreList(List<DepartmentScore> departmentScoreList) {
+		this.departmentScoreList = departmentScoreList;
+	}
+
+	private String error;					//负责在失败页面显示信息
+	
+	
+	
+	public List<String> getMessageList() {
+		return messageList;
+	}
+
+	public void setMessageList(List<String> messageList) {
+		this.messageList = messageList;
+	}
+
+
+	public String getError() {
+		return error;
+	}
+
+	public void setError(String error) {
+		this.error = error;
+	}
+
+	private boolean scoringMarker;	//评分标记	用来标记评分过程结束与否
+	public boolean isScoringMarker() {
+		return scoringMarker;
+	}
+	public void setScoringMarker(boolean scoringMarker) {
+		this.scoringMarker = scoringMarker;
+	}
+
+/**
+ * 部门互评计算分数
+ * @return
+ */
+	public String departmentScore(){
+		try {
+				//给部门算分，并插入数据库中
+				boolean isSuccess=calculateScoreService.calculateDepartmentScore();
+				//如果算分成功
+				if(isSuccess){
+					departmentScoreList=calculateScoreService.getDepartmentScoreList();
+					return "toDepartmentScoreList";
+				}
+				//如果算分不成功,给查询页面提示“部门互评算分”不成功
+				else{
+					error="计算分数不成功";
+					return "Failure";
+				}
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			error=e.getMessage();
+			return "Failure";
+		}
+	}
+	
+	/**
+	 * 当用户在菜单中点击“部门得分的时候”，对应的Action
+	 * 		负责确定，当前的评分过程是否结束，并且提示用户。
+	 * @return
+	 */
+	public String confirmAccomplishDepartmentScore(){
+		try {
+			//是否已近算过分了
+			if(getScoreService.confirmOnlyCalculateDepartmentScore()){
+				//判断部门互评打分是否结束
+				messageList=getScoreService.confirmAccomplishDepartmentScore();
+				//判断重点工作打分是否结束
+				List<String> keyWorkMessageList=getScoreService.confirmKeyWorkAccomplishScore();
+				for(int i=0;i<keyWorkMessageList.size();i++){
+					messageList.add(keyWorkMessageList.get(i));
+				}
+			}else{
+				messageList=new ArrayList<String>();
+				messageList.add("部门绩效已经计算过了");
+			}
+			//如果评分过程没有结束
+			if(messageList.size()!=0){
+				//将评分标记变成false；
+				scoringMarker=false;
+			}
+			//评分过程结束
+			else{
+				//将评分标记变成true
+				scoringMarker=true;
+			}
+			return "success";
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			return "error";
+		}
+	}
+	
+	/**
+	 * 当点击“部门得分”，如果评分过程还没有结束，那么点击返回对应的action
+	 * @return
+	 */
+	public String goBack(){
+		return "goBackWelcome";
+	}
+	
+//======================================================================以下归为员工计算分数=================================================================
+	/**
+	 * 判断员工打分过程有没有结束	&& 判断是否已经计算过了
+	 */
+	public String confirmAccomplishStaffScore(){
+		try {
+			if(getScoreService.confirmOnlyCalculateStaffScore()){
+				//判断“任务进度是否被录入”
+				if(getScoreService.confirmTaskProgressInput()){
+					//判断部门分数是否已经计算出来
+					if(!getScoreService.confirmOnlyCalculateDepartmentScore()){
+						//判断员工打分是否结束
+						messageList=getScoreService.confirmAccomplishStaffScore();
+					}else{
+						messageList=new ArrayList<String>();
+						messageList.add("部门分数还没有被计算出来");
+					}
+				}else{
+					messageList=new ArrayList<String>();
+					messageList.add("任务进度还没有被录入");
+				}
+			}else{
+				messageList=new ArrayList<String>();
+				messageList.add("员工绩效已经计算过了");
+			}
+			
+			//如果评分过程没有结束
+			if(messageList.size()!=0){
+				//将评分标记变成false；
+				scoringMarker=false;
+			}
+			//评分过程结束
+			else{
+				//将评分标记变成true
+				ConfigurationDataUtil.updateValue("start_score", "false");
+			//	ConfigurationDataUtil.updateValue("which_month", "00");
+			//	ConfigurationDataUtil.updateValue("which_year", "0000");
+				scoringMarker=true;
+			}
+			return "toConfirmStaffScore";
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			return "error";
+		}
+	}
+//======================================================================================================================================================
+	
+	/**
+	 * 用来给员工计算分数
+	 * @return
+	 */
+	public String calculateStaffScore(){
+		try {
+			boolean success=calculateScoreService.calculateStaffScore();
+			if(success){
+				return "toStaffScoreExcel";
+			}else{
+				return "error";
+			}
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			return "error";
+		}
+	}
+	
+	
+	private InputStream is;		//导出excel表格的输入流
+	
+	public InputStream getIs() {
+		return is;
+	}
+
+	public void setIs(InputStream is) {
+		this.is = is;
+	}
+	
+	/**
+	 * 员工计算分数结束后，导出Excel表格
+	 * @return
+	 */
+	public String exportScoreExcel(){
+		//获取当前时间
+		SimpleDateFormat simpleDateFormat=new SimpleDateFormat("yyyy-MM-dd");
+		String format=simpleDateFormat.format(new Date(System.currentTimeMillis()));
+		System.out.println(format);
+		WritableWorkbook workbook;
+		ByteArrayOutputStream os = new ByteArrayOutputStream();
+		
+		try{
+			List<StaffScore> staffScoreList=getScoreService.getStaffScoreList();
+			
+			workbook = Workbook.createWorkbook(os);
+			WritableSheet sheet = workbook.createSheet("员工绩效考评", 0);
+			
+			sheet.addCell(new jxl.write.Label(0, 0, "工号"));
+			sheet.addCell(new jxl.write.Label(1, 0, "名字"));
+			sheet.addCell(new jxl.write.Label(2, 0, "性别"));
+			sheet.addCell(new jxl.write.Label(3, 0, "部门"));
+			sheet.addCell(new jxl.write.Label(4, 0, "绩效"));
+			sheet.addCell(new jxl.write.Label(5, 0, "日期"));
+			sheet.addCell(new jxl.write.Label(6, 0, "描述"));
+			
+			for(int i=0;i<staffScoreList.size();i++){
+				StaffScore staffScore=staffScoreList.get(i);
+				System.out.println(staffScore.getStaff().getStaffId()+","+staffScore.getStaff().getStaffName()+","+staffScore.getStaff().getStaffSex()+","+
+						staffScore.getStaff().getDepartment().getDepartmentName()+","+staffScore.getTotalScore()+","+staffScore.getInstruction());
+				sheet.addCell(new jxl.write.Label(0, i+1, String.valueOf(staffScore.getStaff().getStaffId())));
+				sheet.addCell(new jxl.write.Label(1, i+1, staffScore.getStaff().getStaffName()));
+				sheet.addCell(new jxl.write.Label(2, i+1, staffScore.getStaff().getStaffSex()));
+				sheet.addCell(new jxl.write.Label(3, i+1, staffScore.getStaff().getDepartment().getDepartmentName()));
+				sheet.addCell(new jxl.write.Label(4, i+1, String.valueOf(staffScore.getTotalScore())));
+				sheet.addCell(new jxl.write.Label(5, i+1, format));
+				sheet.addCell(new jxl.write.Label(6,i+1,staffScore.getInstruction()));
+			}
+			workbook.write();
+			workbook.close();
+			is = new ByteArrayInputStream(os.toByteArray());
+			return "excel";
+		}catch(Exception e){
+			e.printStackTrace();
+			return "error";
+		}
+	}
+	
+	public String toCalculateDepartmentScore(){
+		return "toCalculateDepartmentScore";
+	}
+	public String toCalculateStaffScore(){
+		return "toCalculateStaffScore";
+	}
+}

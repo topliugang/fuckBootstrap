@@ -1,0 +1,212 @@
+package com.chinanetwork.performance.dao;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.util.ArrayList;
+import java.util.List;
+
+import com.chinanetwork.performance.bean.Department;
+import com.chinanetwork.performance.bean.DepartmentKeyWork;
+import com.chinanetwork.performance.util.DataBaseUtil;
+
+public class DepartmentKeyWorkDao {
+	/**
+	 * 根据登陆用户所属的部门，查看该部门的所有的重点工作列表
+	 * @param departmentId
+	 * @return
+	 * @throws Exception
+	 */
+	public List<DepartmentKeyWork> getMyDepartmentKeyWorkList(int departmentId)throws Exception{
+		List<DepartmentKeyWork> departmentKeyWorks=new ArrayList<DepartmentKeyWork>();
+		
+		String sql="select dwk.key_work_id,dwk.department_id,d.department_name,d.higher_department_id," +
+				"dwk.key_work_content,dwk.start_year,dwk.start_month,dwk.end_year,dwk.end_month " +
+				"from department_key_work dwk,department d where dwk.department_id=d.department_id and dwk.department_id=?";
+		
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, departmentId);
+			
+			resultSet=preparedStatement.executeQuery();
+			while(resultSet.next()){
+				DepartmentKeyWork departmentKeyWork=new DepartmentKeyWork(resultSet.getInt("dwk.key_work_id"),
+						new Department(resultSet.getInt("dwk.department_id"),resultSet.getString("d.department_name"),resultSet.getInt("d.higher_department_id")),
+						resultSet.getString("dwk.key_work_content"),resultSet.getInt("dwk.start_year"),
+						resultSet.getInt("dwk.start_month"),resultSet.getInt("dwk.end_year"),resultSet.getInt("dwk.end_month"));
+				departmentKeyWorks.add(departmentKeyWork);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		
+		return departmentKeyWorks;
+	}
+	
+	//-----------------------------------------------------------------------------------分页代码开始
+	public List<DepartmentKeyWork> getMyDepartmentKeyWorkList(int departmentId,int pageStart,int pageSize)throws Exception{
+		List<DepartmentKeyWork> departmentKeyWorks=new ArrayList<DepartmentKeyWork>();
+		String sql="select dwk.key_work_id,dwk.department_id,d.department_name,d.higher_department_id," +
+		"dwk.key_work_content,dwk.start_year,dwk.start_month,dwk.end_year,dwk.end_month " +
+		"from department_key_work dwk,department d where dwk.department_id=d.department_id and dwk.department_id=? limit ?,?";
+		
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, departmentId);
+			preparedStatement.setInt(2, pageStart);
+			preparedStatement.setInt(3, pageSize);
+			
+			resultSet=preparedStatement.executeQuery();
+			while(resultSet.next()){
+				DepartmentKeyWork departmentKeyWork=new DepartmentKeyWork(resultSet.getInt("dwk.key_work_id"),
+						new Department(resultSet.getInt("dwk.department_id"),resultSet.getString("d.department_name"),resultSet.getInt("d.higher_department_id")),
+						resultSet.getString("dwk.key_work_content"),resultSet.getInt("dwk.start_year"),
+						resultSet.getInt("dwk.start_month"),resultSet.getInt("dwk.end_year"),resultSet.getInt("dwk.end_month"));
+				departmentKeyWorks.add(departmentKeyWork);
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);	
+		}
+		return departmentKeyWorks;
+	}
+	
+	public int getTotalRecored(int departmentId)throws Exception{
+		int count=0;
+		String sql="select count(*) count from department_key_work dwk,department d where dwk.department_id=d.department_id and dwk.department_id=?";
+		
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, departmentId);
+			
+			resultSet=preparedStatement.executeQuery();
+			
+			if(resultSet.next()){
+				count=resultSet.getInt("count");
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		return count;
+	}
+	//-----------------------------------------------------------------------------------分页代码结束
+	
+	/**
+	 * 根据登陆用户，找到其所属部门
+	 * @param staffId
+	 * @return
+	 * @throws Exception
+	 */
+	public Department getDepartment(int staffId)throws Exception{
+		Department department=new Department();
+		String sql="select s.department_id,d.department_name,d.higher_department_id " +
+				"from staff s,department d where s.department_id=d.department_id and s.staff_id=?";
+		
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1, staffId);
+			
+			resultSet=preparedStatement.executeQuery();
+			while(resultSet.next()){
+				department=new Department(resultSet.getInt("s.department_id"),resultSet.getString("d.department_name"),resultSet.getInt("d.higher_department_id"));
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		
+		return department;
+	}
+	
+	/**
+	 * 获取重点工作表中编号最大的编号
+	 * @return
+	 * @throws Exception
+	 */
+	public int getMaxKeyWorkId()throws Exception{
+		int maxKeyWorkId=-1;
+		String sql="select max(key_work_id) max from department_key_work";
+		
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		ResultSet resultSet=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			
+			resultSet=preparedStatement.executeQuery();
+			if(resultSet.next()){
+				maxKeyWorkId=resultSet.getInt("max");
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(resultSet, preparedStatement, connection);
+		}
+		
+		return maxKeyWorkId;
+	}
+	
+	/**
+	 * 添加重点工作
+	 * @param keyWorkId
+	 * @param departmentId
+	 * @param content
+	 * @param sYear
+	 * @param sMonth
+	 * @param eYear
+	 * @param eMonth
+	 * @throws Exception
+	 */
+	public void insertDepartmentKeyWork(int keyWorkId,int departmentId,String content,int sYear,int sMonth,int eYear,int eMonth)throws Exception{
+		String sql="insert into department_key_work values(?,?,?,?,?,?,?);";
+		
+		Connection connection=null;
+		PreparedStatement preparedStatement=null;
+		
+		try{
+			connection=DataBaseUtil.getConnection();
+			preparedStatement=connection.prepareStatement(sql);
+			preparedStatement.setInt(1,keyWorkId);
+			preparedStatement.setInt(2, departmentId);
+			preparedStatement.setString(3, content);
+			preparedStatement.setInt(4, sYear);
+			preparedStatement.setInt(5, sMonth);
+			preparedStatement.setInt(6, eYear);
+			preparedStatement.setInt(7, eMonth);
+			
+			preparedStatement.executeUpdate();
+		}catch(Exception e){
+			e.printStackTrace();
+		}finally{
+			DataBaseUtil.close(preparedStatement, connection);
+		}
+	}
+}

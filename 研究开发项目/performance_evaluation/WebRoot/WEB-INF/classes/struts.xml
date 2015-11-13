@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="UTF-8"?> 
+<!DOCTYPE struts PUBLIC 
+"-//Apache Software Foundation//DTD Struts Configuration 2.1//EN" "http://struts.apache.org/dtds/struts-2.1.dtd">
+<struts>
+	<constant name="struts.multipart.maxSize" value="1099511627776" />
+	
+	<!--<constant name="struts.multipart.maxSize" value="1048576" />
+	-->
+	<constant name="struts.custom.i18n.resources" value="messageResource" />
+	<package name="default" namespace="/" extends="struts-default">
+	
+	<!-- 定义拦截器 -->
+		<interceptors>
+			<interceptor name="loginInterceptor" class="com.chinanetwork.performance.web.interceptor.LoginInterceptor">
+			</interceptor>
+			
+			<interceptor-stack name="mydefault">
+				<interceptor-ref name="defaultStack"/>
+				<interceptor-ref name="loginInterceptor"/>
+			</interceptor-stack>
+		</interceptors>
+	
+		<!-- 设置全局的result -->
+		<global-results>
+			<result name="noLogin">/goback.jsp</result>
+			<result name="error">/jsp/error.jsp</result>
+		</global-results>
+		
+		<action name="login"
+			class="com.chinanetwork.performance.web.action.LoginAction">
+			<!--<result name="success">main.html</result>-->
+			<result name="success" type="chain">showMain</result>
+			<result name="failure">/login.jsp</result>
+		</action>
+		
+		<action name="toWelcome" class="com.chinanetwork.performance.web.action.ToWelcome">
+			<result name="toWelcome">welcome.jsp</result>
+		</action>
+		<action name="toMenu" class="com.chinanetwork.performance.web.action.ToMenuAction">
+			<result name="toMenu">menu.jsp</result>
+		</action>
+		
+		<action name="showMain" class="">
+			<interceptor-ref name="mydefault"/>
+			<result name="success">main.html</result>
+			<!-- 指定默认拦截器 -->
+		</action>
+
+		<action name="exit" class="com.chinanetwork.performance.web.action.LoginAction" method = "exit">
+			<result name = "exit">/login.jsp</result>
+		</action>
+
+
+		<action name="post_*"
+			class="com.chinanetwork.performance.web.action.PostManageAction"
+			method="{1}">
+			<interceptor-ref name="mydefault"/>
+			<result name="list">/jsp/postList.jsp</result>
+			<result name="toDetail">/jsp/postDetail.jsp</result>
+			<result name="toAdd">/jsp/postAdd.jsp</result>
+			<result name="toModify">/jsp/postModify.jsp</result>
+			<result name="delete" type="chain">post_list</result>
+			<result name="add" type="chain">post_list</result>
+			<result name="modify" type="chain">post_list</result>
+		</action>
+
+		<action name="department_*"
+			class="com.chinanetwork.performance.web.action.DepartmentManageAction"
+			method="{1}">
+			<interceptor-ref name="mydefault"/>
+			<result name="list">/jsp/departmentList.jsp</result>
+			<result name="toDetail">/jsp/departmentDetail.jsp</result>
+			<result name="toAdd">/jsp/departmentAdd.jsp</result>
+			<result name="toModify">/jsp/departmentModify.jsp</result>
+			<result name="delete" type="chain">department_list</result>
+			<result name="add" type="chain">department_list</result>
+			<result name="modify" type="chain">department_list</result>
+		</action>
+		<action name="role_*"
+			class="com.chinanetwork.performance.web.action.RoleManageAction"
+			method="{1}">
+			<interceptor-ref name="mydefault"/>
+			<result name="list">/jsp/roleList.jsp</result>
+			<result name="toDetail">/jsp/roleDetail.jsp</result>
+			<result name="toAdd">/jsp/roleAdd.jsp</result>
+			<result name="toModify">/jsp/roleModify.jsp</result>
+			<result name="delete" type="chain">role_list</result>
+			<result name="add" type="chain">role_list</result>
+			<result name="modify" type="chain">role_list</result>
+		</action>
+
+
+		<action name="staff_*"
+			class="com.chinanetwork.performance.web.action.StaffManageAction"
+			method="{1}">
+			<interceptor-ref name="mydefault"/>
+			<result name="list">/jsp/staffList.jsp</result>
+			<result name="toDetail">/jsp/staffDetail.jsp</result>
+			<result name="toAdd">/jsp/staffAdd.jsp</result>
+			<result name="toModify">/jsp/staffModify.jsp</result>
+			<result name="delete" type="chain">staff_list</result>
+			<result name="add" type="chain">staff_list</result>
+			<result name="modify" type="chain">staff_list</result>
+			<result name="topasswordmodify">/jsp/passwordModify.jsp</result>
+			<result name="passwordmodify" type="chain">staff_topasswordmodify</result>
+		</action>
+
+
+		<action name="departmentScoreItem_*"
+			class="com.chinanetwork.performance.web.action.DepartmentScoreItemManageAction"
+			method="{1}">
+			<interceptor-ref name="mydefault"/>
+			<result name="list">/jsp/departmentScoreItemList.jsp</result>
+			<result name="toDetail">/jsp/departmentScoreItemDetail.jsp</result>
+			<result name="toAdd">/jsp/departmentScoreItemAdd.jsp</result>
+			<result name="toModify">/jsp/departmentScoreItemModify.jsp</result>
+			<result name="delete" type="chain">departmentScoreItem_list</result>
+			<result name="add" type="chain">departmentScoreItem_list</result>
+			<result name="modify" type="chain">departmentScoreItem_list</result>
+		</action>
+
+		<action name="staffScoreItem_*"
+			class="com.chinanetwork.performance.web.action.StaffScoreItemManageAction"
+			method="{1}">
+			<interceptor-ref name="mydefault"/>
+			<result name="list">/jsp/staffScoreItemList.jsp</result>
+			<result name="toDetail">/jsp/staffScoreItemDetail.jsp</result>
+			<result name="toAdd">/jsp/staffScoreItemAdd.jsp</result>
+			<result name="toModify">/jsp/staffScoreItemModify.jsp</result>
+			<result name="delete" type="chain">staffScoreItem_list</result>
+			<result name="add" type="chain">staffScoreItem_list</result>
+			<result name="modify" type="chain">staffScoreItem_list</result>
+		</action>
+
+
+		<action name="score_*"
+			class="com.chinanetwork.performance.web.action.RateAction" method="{1}">
+			<interceptor-ref name="mydefault"/>
+			<result name="listDepartmentNoScoredItem">/jsp/departmentNoScoredItem.jsp</result>
+			<result name="listDepartmentScoredItem">/jsp/departmentScoredItem.jsp</result>
+			<result name="listStaffNoScoredItem">/jsp/staffNoScoredItem.jsp</result>
+			<result name="listStaffScoredItem">/jsp/staffScoredItem.jsp</result>
+			<result name="departmentScore" type="chain">score_listDepartmentNoScoredItem</result>
+			<result name="staffScore" type="chain">score_listStaffNoScoredItem</result>
+		</action>
+		
+		<action name="workScore_*" class="com.chinanetwork.performance.web.action.KeyWorkRateAction" method="{1}">
+		<interceptor-ref name="mydefault"/>
+			<result name="departmentWorkScoreItem">/jsp/workDepartment.jsp</result>
+			<result name="departmentWorkScoreModify">/jsp/workDepartmentModify.jsp</result>
+		</action>
+		
+	
+		
+		<action name="departmentScore_*" class="com.chinanetwork.performance.web.action.ScoreAction" method="{1}">
+		<interceptor-ref name="mydefault"/>
+			<result name="success">/jsp/toCalculateDepartmentScore.jsp</result>
+			<result name="goBackWelcome">welcome.jsp</result>
+			<result name="toCalculateDepartmentScore">/jsp/toCalculateDepartmentScore.jsp</result>
+		</action>
+		
+		<action name="staffScore_*" class="com.chinanetwork.performance.web.action.ScoreAction" method="{1}">
+			<interceptor-ref name="mydefault"/>
+				<result name="toConfirmStaffScore">/jsp/toCalculateStaffScore.jsp</result>
+				<result name="goBackWelcome">welcome.jsp</result>
+				<result name="toStaffScoreExcel">/jsp/staffScoreExcel.jsp</result>
+				<result name="excel" type="stream">
+					<param name="contentType">application/vnd.ms-excel</param>
+					<param name="inputName">is</param>
+					<param name="contentDisposition">filename="export.xls"</param>
+					<param name="bufferSize">1024</param>
+				</result>
+				<result name="toCalculateStaffScore">/jsp/toCalculateStaffScore.jsp</result>
+		</action>
+		
+		
+		<action name="statisticalQuery_*" class="com.chinanetwork.performance.web.action.StatisticalQueryAction" method="{1}">
+		<interceptor-ref name="mydefault"/>
+			<!-- result name="toListDepartmentScore">/jsp/listDepartmentScore.jsp</result>
+			<result name="listDepartmentScore" type="chain"> statisticalQuery_toListDepartmentScore</result>
+			<result name="toModifyDepartmentScore">/jsp/modifyDepartmentScore.jsp</result>
+			<result name="toListStaffScore">/jsp/listStaffScore.jsp</result>
+			<result name="toTestStaffScorePage">/jsp/toTestStaffScorePage.jsp</result>
+			<result name="toModifyStaffScore">/jsp/modifyStaffScore.jsp</result> -->
+			<result name="goBackWelcome">welcome.jsp</result>
+			<result name="toTestExportExcel">/jsp/toTestExportPage.jsp</result>
+			<result name="excel" type="stream">
+				<param name="contentType">application/vnd.ms-excel</param>
+				<param name="inputName">is</param>
+				<param name="contentDisposition">filename="exportStaffScore.xls"</param>
+				<param name="bufferSize">1024</param>
+			</result>
+
+
+			<result name="toDepartmentScoreQuery">/jsp/departmentScoreQuery.jsp</result>
+			<result name="departmentScoreQuery">/jsp/departmentScoreQuery.jsp</result>
+			<result name="toStaffScoreQuery">/jsp/staffScoreQuery.jsp</result>
+			<result name="staffScoreQuery">/jsp/staffScoreQuery.jsp</result>
+
+			<result name="toDepartmentRecordQuery">/jsp/departmentRecordQuery.jsp</result>
+			<result name="departmentRecordQuery">/jsp/departmentRecordQuery.jsp</result>
+			<result name="toStaffRecordQuery">/jsp/staffRecordQuery.jsp</result>
+			<result name="staffRecordQuery">/jsp/staffRecordQuery.jsp</result>
+
+
+		</action>
+
+		
+
+		<action name="welcome"
+			class="com.chinanetwork.performance.web.action.WelcomeAction">
+			<interceptor-ref name="mydefault"/>
+			<result name="success">welcome.jsp</result>
+			<result name="fail">nameform.jsp</result>
+		</action>
+
+		<action name="exportExcel"
+			class="com.chinanetwork.performance.web.action.ExcelAction">
+			<interceptor-ref name="mydefault"/>
+			<result name="excel" type="stream">
+				<param name="contentType">application/vnd.ms-excel</param>
+				<param name="inputName">is</param>
+				<param name="contentDisposition">filename="export.xls"</param>
+				<param name="bufferSize">1024</param>
+			</result>
+		</action>
+		<action name="importExcel"
+			class="com.chinanetwork.performance.web.action.ExcelAction" method="importExcel">
+<!--			 动态设置savePath的属性值 -->
+<!--			<param name="savePath">/images</param>-->
+<!--			<result name="success">/WEB-INF/page/message.jsp</result>-->
+<!--			<result name="input">/upload/upload.jsp</result>-->
+<!--			<interceptor-ref name="fileUpload">                 文件过滤 -->
+<!--				<param name="allowedTypes">image/bmp,image/png,image/gif,image/jpeg</param>                 文件大小, 以字节为单位 -->
+<!--				<param name="maximumSize">1025956</param>-->
+<!--			</interceptor-ref>             默认拦截器必须放在fileUpload之后，否则无效 -->
+<!--			<interceptor-ref name="defaultStack" />-->
+			<result name="success">welcome.jsp</result>
+		</action>
+		
+		<action name="taskProgress_*"
+			class="com.chinanetwork.performance.web.action.TaskProgressAction" method="{1}">
+			<interceptor-ref name="mydefault"/>
+			<result name="list">/jsp/taskProgress.jsp</result>
+			<result name="toInput">/jsp/taskProgressAdd.jsp</result>
+			<result name="input" type="chain">taskProgress_list</result>
+		</action>
+		
+		<action name="startScore_*"
+			class="com.chinanetwork.performance.web.action.StartScoreAction" method="{1}">
+			<interceptor-ref name="mydefault"/>
+			<result name="list">/jsp/startScore.jsp</result>
+			<result name="input" type="chain">startScore_list</result>
+		</action>
+		
+		<action name="message_*"
+			class="com.chinanetwork.performance.web.action.MessageAction" method="{1}">
+			
+			<result name="write">/jsp/messageWrite.jsp</result>
+			<result name="send" type="chain">message_write</result>
+			<result name="read">/jsp/messageRead.jsp</result>
+			<result name="receive" type="chain">message_receive</result>
+			<result name="listSent">/jsp/messageSentList.jsp</result>
+			<result name="listReceived">/jsp/messageReceivedList.jsp</result>
+			<result name="listUnread">/jsp/messageUnreadList.jsp</result>
+			<result name="input" type="redirectAction">
+				<param name="actionName">message_write</param>
+				<param name="fileuploadInfo">上传文件大小超出限制,上传失败</param>
+			</result>
+			<result name="success" type="stream">
+				<param name="contentType">text/plain</param>
+				<param name="inputName">downLoad</param>
+				<param name="contentDisposition">attachement;filename=${fileName}</param>
+				<param name="bufferSize">50000000</param>
+			</result>
+			<result name="toSendMessageRead">/jsp/sendMessageRead.jsp</result>
+			 <interceptor-ref name="fileUpload">
+                <param name="maximumSize">5368709120</param> 
+            </interceptor-ref>
+            <interceptor-ref name="mydefault"/>
+		</action>
+		
+			<!-- 消息接收者选择模块 -->
+		<action name="choice_*" class="com.chinanetwork.performance.web.action.MessageAcceptterChoiceAction" method="{1}">
+			<result name="toAccepter">/jsp/messageAccepterChoice.jsp</result>
+		</action>
+		
+		<!-- 文件下载测试 -->
+		<action name="downFile" class="com.chinanetwork.performance.web.action.DownLoadAction">
+			<result name="success" type="stream">
+				<param name="contentType">text/plain</param>
+				<param name="inputName">downLoad</param>
+				<param name="contentDisposition">attachement;filename=${fileName}</param>
+				<param name="bufferSize">50000000</param>
+			</result>
+		</action>
+		
+		
+		<action name="keyWork_*" class="com.chinanetwork.performance.web.action.KeyWorkAction" method="{1}">
+		<interceptor-ref name="mydefault"/>
+			<result name="toListDepartmentKeyWork">/jsp/keyWorkList.jsp</result>
+			<result name="toAddDepartmentKeyWork">/jsp/KeyWorkAdd.jsp</result>
+			<result name="addError">/jsp/KeyWorkAdd.jsp</result>
+			<result name="toDepartmentKeyWorkList" type="chain">keyWork_getMyDepartmentKeyWorkList</result>
+		</action>
+		
+		<action name="weekMeeting_*" class="com.chinanetwork.performance.web.action.WeekMeetingAction" method="{1}">
+			<result name="write">/jsp/weekMeetingRecordWrite.jsp</result>
+			<result name="list">/jsp/weekMeetingRecordList.jsp</result>
+			<result name="read">/jsp/weekMeetingRecordRead.jsp</result>
+		</action>
+		<action name="monthMeeting_*" class="com.chinanetwork.performance.web.action.MonthMeetingAction" method="{1}">
+			<result name="write">/jsp/monthMeetingRecordWrite.jsp</result>
+			<result name="list">/jsp/monthMeetingRecordList.jsp</result>
+			<result name="read">/jsp/monthMeetingRecordRead.jsp</result>
+		</action>
+		<action name="trainingPlan_*" class="com.chinanetwork.performance.web.action.TrainingPlanAction" method="{1}">
+			<result name="write">/jsp/trainingPlanWrite.jsp</result>
+			<result name="list">/jsp/trainingPlanList.jsp</result>
+			<result name="read">/jsp/trainingPlanRead.jsp</result>
+		</action>
+	</package>
+</struts>

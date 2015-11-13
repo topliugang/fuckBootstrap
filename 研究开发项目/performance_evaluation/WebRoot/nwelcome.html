@@ -1,0 +1,166 @@
+<!-- %@ page language="java" contentType="text/html; charset=UTF-8"
+	pageEncoding="UTF-8"%>
+<%@ page import="com.chinanetwork.performance.bean.Staff"%> -->
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=gb2312" />
+<title>无标题文档</title>
+
+
+<script>
+var  highlightcolor='#eafcd5';
+//此处clickcolor只能用win系统颜色代码才能成功,如果用#xxxxxx的代码就不行,还没搞清楚为什么:(
+var  clickcolor='#51b2f6';
+function  changeto(){
+source=event.srcElement;
+if  (source.tagName=="TR"||source.tagName=="TABLE")
+return;
+while(source.tagName!="TD")
+source=source.parentElement;
+source=source.parentElement;
+cs  =  source.children;
+//alert(cs.length);
+if  (cs[1].style.backgroundColor!=highlightcolor&&source.id!="nc"&&cs[1].style.backgroundColor!=clickcolor)
+for(i=0;i<cs.length;i++){
+	cs[i].style.backgroundColor=highlightcolor;
+}
+}
+
+function  changeback(){
+if  (event.fromElement.contains(event.toElement)||source.contains(event.toElement)||source.id=="nc")
+return
+if  (event.toElement!=source&&cs[1].style.backgroundColor!=clickcolor)
+//source.style.backgroundColor=originalcolor
+for(i=0;i<cs.length;i++){
+	cs[i].style.backgroundColor="";
+}
+}
+
+function  clickto(){
+source=event.srcElement;
+if  (source.tagName=="TR"||source.tagName=="TABLE")
+return;
+while(source.tagName!="TD")
+source=source.parentElement;
+source=source.parentElement;
+cs  =  source.children;
+//alert(cs.length);
+if  (cs[1].style.backgroundColor!=clickcolor&&source.id!="nc")
+for(i=0;i<cs.length;i++){
+	cs[i].style.backgroundColor=clickcolor;
+}
+else
+for(i=0;i<cs.length;i++){
+	cs[i].style.backgroundColor="";
+}
+}
+</script>
+<style type="text/css"><!--
+
+.STYLE2 {font-family: Arial, Helvetica, sans-serif}
+-->
+
+#div1{
+	-moz-transform:rotate(180deg); 
+	-webkit-transform:rotate(180deg); 
+	transform:rotate(180deg); 
+	filter:progid:DXImageTransform.Microsoft.BasicImage(rotation=2);
+	position: absolute; 
+	left: 0px; 
+	top: 0px;
+}
+
+#div2{
+	position: absolute; 
+	right: 1px; 
+	bottom: 1px;
+}
+
+#div_welcome{
+	position: absolute; 
+	left: 430px; 
+	top: 200px;
+}
+</style>
+</head>
+
+<body>
+
+<div id="div1">
+	<img src="images/welcom.jpg" />
+</div>
+
+<div id="div_welcome" align="center">
+	<img src="images/ww.png" />
+</div>
+
+<div id="div2">
+	<img src="images/welcom.jpg" />
+</div>
+</body>
+</html>
+
+<!--<div class="tog_contact">
+  <div class="t_con_box">
+  <div class="drift_left">
+	  <p><img src="images/top_logo.gif" /></p>
+	  <p class="f-yh">国内首款整合网页、QQ、电话客服系统</p>
+	</div>
+	<div class="phone">
+	  <dl>
+	    <dd>
+		  <div><img src="images/icon_phone.gif" /><h3 class="f-yh">电话咨询</h3><span>PHONE CONSULTING</span></div>
+		  <p>400-0645-995</p>
+		</dd>
+		<dd>
+		  <div><img src="images/icon_consult.gif" class="consult_img" /><h3 class="f-yh">在线咨询</h3><span>ONLINE CONSULTING</span></div>
+		  <a href="http://wpa.qq.com/msgrd?V=3&Uin=1322628951&Site=客服宝_永久免费客服系统_内嵌qq在线客服系统&Menu=yes" class="online" target="_blank" ><q class="f-yh">在线客服</q></a><a href="http://wpa.qq.com/msgrd?V=3&Uin=1322628951&Site=客服宝_永久免费客服系统_内嵌qq在线客服系统&Menu=yes" class="online" target="_blank" ><q class="f-yh">售后咨询</q></a>
+		</dd>
+	  </dl>
+	</div>
+	<div class="map"><img src="images/map.gif" /></div>
+  
+  	<div>
+  		<img src="images/info.png"></img>
+  	</div>
+  	<div style="border:1px solid #CCCCCC;margin: 10px 10px 10px 100px; width:800px;">
+  		<br/>
+  		<p style="color:#79A813;font-size:20px;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;各营业部一票否决制度：</p>
+  		<br/>
+  		<p style="color:#1A648F;font-size:15px;">
+  			&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+  			1、有违法乱纪现象实行一票否决；<br/>
+  			&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+  			2、造成人员伤亡现象实行一票否决；<br/>
+  			&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+  			3、因播出事故造成不良影响实行一票否决；<br/>
+  			&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+  			4、因传输中断超过维修时限造成不良影响实行一票否决；<br/>
+  			&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+  			5、因人为责任造成公司财产重大损失达万元以上实行一票否决。<br/>
+  		</p>
+  		<br/>
+  	</div>
+  	<br />
+  	
+  	<div style="border:1px solid #CCCCCC;margin: 10px 10px 10px 100px; width:800px;">
+  		<br/>
+  		<p style="color:#79A813;font-size:20px;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;本次考评提示信息：</p>
+  		<br/>
+  		<p style="color:#1A648F;font-size:15px;">
+  			&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+  			1、本次考评是对&nbsp;&nbsp;<%=timeList.get("绩效年份")%>&nbsp;&nbsp;年&nbsp;&nbsp;<%=timeList.get("绩效月份")%>&nbsp;&nbsp;月分的绩效进行考核；<br/>
+  			&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+  			2、本次绩效考核的开始时间为：&nbsp;&nbsp;&nbsp;&nbsp;<%=timeList.get("绩效考评开始时间")%>；<br/>
+  			&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+  			3、本次绩效考核的结束时间为：&nbsp;&nbsp;&nbsp;&nbsp;<%=timeList.get("绩效考评结束时间")%>；<br/>
+  		</p>
+  		<br/>
+  	</div>
+  	<%} %>
+  </div>
+</div>
+<div class="tog" id="tog"><span id="blink">我的通知${error}</span></div>
+
+-->

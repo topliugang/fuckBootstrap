@@ -1,0 +1,110 @@
+package com.chinanetwork.performance.service;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import com.chinanetwork.performance.bean.Department;
+import com.chinanetwork.performance.bean.DepartmentKeyWork;
+import com.chinanetwork.performance.bean.Staff;
+import com.chinanetwork.performance.dao.DepartmentKeyWorkDao;
+import com.chinanetwork.performance.util.ConfigurationDataUtil;
+
+public class DepartmentKeyWorkService {
+
+	private DepartmentKeyWorkDao departmentKeyWorkDao=new DepartmentKeyWorkDao();
+	
+	/**
+	 * 根据登录用户，找到其所属部门的所有重点工作列表
+	 * @param staff
+	 * @return
+	 * @throws Exception
+	 */
+	public List<DepartmentKeyWork> getLoginStaffKeyWorkList(Staff staff)throws Exception{
+		Department department=staff.getDepartment();
+		int departmentId=department.getDepartmentId();
+		List<DepartmentKeyWork> departmentkeyWorkList=departmentKeyWorkDao.getMyDepartmentKeyWorkList(departmentId);
+		return departmentkeyWorkList;
+	}
+	
+	//----------------------------------------------------------------分页代码开始
+	public List<DepartmentKeyWork> getLoginStaffKeyWorkList(Staff staff,int pageNo)throws Exception{
+		Department department=staff.getDepartment();
+		int departmentId=department.getDepartmentId();
+		
+		String pageSizeStr=ConfigurationDataUtil.getStringValue("page_size");
+		int pageSize=Integer.parseInt(pageSizeStr);
+		
+		int pageStart=(pageNo-1)*pageSize;
+		
+		List<DepartmentKeyWork> departmentKeyWorkList=departmentKeyWorkDao.getMyDepartmentKeyWorkList(departmentId, pageStart, pageSize);
+		
+		if(departmentKeyWorkList.size()==0){
+			return null;
+		}
+		
+		return departmentKeyWorkList;
+	}
+	
+	public Map<String,Integer> getTotalData(Staff staff)throws Exception{
+		Department department=staff.getDepartment();
+		int departmentId=department.getDepartmentId();
+		
+		Map<String,Integer> dataMap=new HashMap<String,Integer>();
+		int pageSize=Integer.parseInt(ConfigurationDataUtil.getStringValue("page_size"));
+		
+		int countRecored=departmentKeyWorkDao.getTotalRecored(departmentId);
+		//计算总页数
+		int countPage=countRecored/pageSize;
+		int mod=countRecored%pageSize;
+		if(mod!=0){
+			countPage=countPage+1;
+		}
+		
+		dataMap.put("countRecored", countRecored);
+		dataMap.put("countPage", countPage);
+		
+		return dataMap;
+	}
+	//----------------------------------------------------------------分页代码结束
+	/**
+	 * 根据登陆用户，找到其所属部门
+	 * @param staffId
+	 * @return
+	 * @throws Exception
+	 */
+	public Department getDepartment(Staff staff)throws Exception{
+		int staffId=staff.getStaffId();
+		return departmentKeyWorkDao.getDepartment(staffId);
+	}
+	/**
+	 * 获取重点工作表中编号最大的编号
+	 * @return
+	 * @throws Exception
+	 */
+	public int getMaxKeyWorkId()throws Exception{
+		int max=departmentKeyWorkDao.getMaxKeyWorkId();
+		if(max==0||max==-1){
+			max=1001;
+		}else{
+			max=max+1;
+		}
+		return max;
+	}
+	/**
+	 * 添加重点工作
+	 * @param keyWorkId
+	 * @param departmentId
+	 * @param content
+	 * @param sYear
+	 * @param sMonth
+	 * @param eYear
+	 * @param eMonth
+	 * @throws Exception
+	 */
+	public void addDepartmentKeyWork(int keyWorkId,Staff staff,String keyWorkContent,String startYear,String startMonth,String endYear,String endMonth)throws Exception{
+		int departmentId=staff.getDepartment().getDepartmentId();
+		departmentKeyWorkDao.insertDepartmentKeyWork(keyWorkId, departmentId, keyWorkContent,Integer.parseInt(startYear), 
+				Integer.parseInt(startMonth), Integer.parseInt(endYear), Integer.parseInt(endMonth));
+	}
+}
