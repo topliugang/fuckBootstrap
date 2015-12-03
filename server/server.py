@@ -10,8 +10,6 @@ class Post:
 
 
 
-
-
 class MainHandler(tornado.web.RequestHandler):
     def get(self):
         self.write("You requested the main page fuckkkkkk")
@@ -23,8 +21,6 @@ class ListHandler(tornado.web.RequestHandler):
 		post1 = Post(1, "first post", "this is first post  hehehe  caoniam", 22)
 		post2 = Post(2, "second post", "this is 2 post  hehehe  caoniam", 22)
 		post3 = Post(3, "third post", "this is 3 post  hehehe  caoniam", 22)
-
-
 
 
 		items = ["Item 1", "Item 2", "Item 3"]

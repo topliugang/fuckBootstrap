@@ -1,11 +1,12 @@
 drop table if exists member; 
 drop table if exists post; 
-
+drop table if exists tag;
 
 create table member(
 id integer primary key autoincrement,
 name text
 );
+
 create table post(
 id integer primary key autoincrement,
 createTime datetime,
@@ -16,10 +17,6 @@ tag integer
 );
 
 create table tag(
-
-);
-create table postContent(
 id integer primary key autoincrement,
-
-
+name text
 );
