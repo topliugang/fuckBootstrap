@@ -5,6 +5,8 @@ import objects
 
 
 class DBFucker:
+		
+
 	def __init(self):
 		self.con = sqlite3.connect("fuck.db")
 		self.cur = con.cursor() 
