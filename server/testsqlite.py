@@ -1,85 +1,54 @@
 # -*- coding:utf-8 -*-  
 
 import sqlite3
-
-def createTable():
-	con = sqlite3.connect("fuck.db")
-	cur = con.cursor() 
-
-	sqlFile = open('createTable.sql', 'r')
-	sqls = sqlFile.read().split(';')
-	for sql in sqls:
-		fuck = sql.strip()
-		print '-----execute sql----------'
-		print fuck
-		cur.execute(fuck)
-		print '-----finished----------'
-		print
-
-	con.commit()
-
-	cur.close()
-	con.close()
+import objects
 
 
-class Post:
+class DBFucker:
+	def __init(self):
+		self.con = sqlite3.connect("fuck.db")
+		self.cur = con.cursor() 
 
-	id = 0
+	def __del(self):
+		self.cur.close()
+		self.con.close()
 
-	def __init__(self, id, createTime, memberId, title, content, tag):
-		self.id = id
-		self.createTime = createTime
-		self.memberId = memberId
-		self.title = title
-		self.content = content
-		self.tag = tag
+	def createTable(self):
+		sqlFile = open('createTable.sql', 'r')
+		sqls = sqlFile.read()
+		self.cur.executescript(sqls)
+		self.con.commit()
 
-	def show(self):
-		print "id: ", self.id
-		print "createTime: ", self.createTime
-		print "memberId: ", self.memberId
-		print "title: ", self.title
-		print "content: ", self.content
-		print "tag: ", self.tag
+	def selectAllPosts(self):
+		self.cur.execute("select id, createTime, memberId, title, content, tag from post")
+		dataSets = cur.fetchall()
+		posts = []
+		for data in dataSets:
+			post = Post(data[0], data[1], data[2], data[3], data[4], data[5])
+			posts.append(post)
+		return posts
 
-
-
-
-def selectAllPosts():
-	con = sqlite3.connect("fuck.db")
-	cur = con.cursor() 
-	cur.execute("select id, createTime, memberId, title, content, tag from post")
-	dataSets = cur.fetchall()
-	posts = []
-	for data in dataSets:
+	def selectPost(self, id):
+		self.cur.execute("select id, createTime, memberId, title, content, tag from post where id=%d" % id)
+		data = cur.fetchone()
 		post = Post(data[0], data[1], data[2], data[3], data[4], data[5])
-		posts.append(post)
-	cur.close()
-	con.close()
-	return posts
+		return post
 
-def selectPost(id):
-	con = sqlite3.connect("fuck.db")
-	cur = con.cursor() 
-	cur.execute("select id, createTime, memberId, title, content, tag from post where id=%d" % id)
-	data = cur.fetchone()
-	post = Post(data[0], data[1], data[2], data[3], data[4], data[5])
-	cur.close()
-	con.close()
-	return post
+	def insertPost(self, post):
+		self.cur.execute("insert into post (id, createTime, memberId, title, content, tag) values(?,?,?,?,?,?)",\
+			(post.id, post.createTime, post.memberId, post.title, post.content, post.tag) )
+		self.con.commit()
+		
 
-def insertPost(post):
-	con = sqlite3.connect("fuck.db")
-	cur = con.cursor() 
-	cur.execute("insert into post (id, createTime, memberId, title, content, tag) values(?,?,?,?,?,?)",\
-		(post.id, post.createTime, post.memberId, post.title, post.content, post.tag) )
-	con.commit()
-	cur.close()
-	con.close()
+
+
+
+
 
 if __name__ == '__main__':
 	#createTable()
-	posts = selectAllPosts()
+	db = DBFucker()
+	posts = db.selectAllPosts()
 	for post in posts:
 		post.show()
 	
