@@ -7,11 +7,15 @@ import objects
 class DBFucker:
 		
 
-	def __init(self):
-		self.con = sqlite3.connect("fuck.db")
-		self.cur = con.cursor() 
 
-	def __del(self):
+	def __init__(self):
+		self.con = sqlite3.connect("fuck.db")
+		self.cur = self.con.cursor() 
+		print self.con
+		print self.cur
+		print "cain"
+
+	def __del__(self):
 		self.cur.close()
 		self.con.close()
 
@@ -23,17 +27,17 @@ class DBFucker:
 
 	def selectAllPosts(self):
 		self.cur.execute("select id, createTime, memberId, title, content, tag from post")
-		dataSets = cur.fetchall()
+		dataSets = self.cur.fetchall()
 		posts = []
 		for data in dataSets:
-			post = Post(data[0], data[1], data[2], data[3], data[4], data[5])
+			post = objects.Post(data[0], data[1], data[2], data[3], data[4], data[5])
 			posts.append(post)
 		return posts
 
 	def selectPost(self, id):
 		self.cur.execute("select id, createTime, memberId, title, content, tag from post where id=%d" % id)
-		data = cur.fetchone()
-		post = Post(data[0], data[1], data[2], data[3], data[4], data[5])
+		data = self.cur.fetchone()
+		post = objects.Post(data[0], data[1], data[2], data[3], data[4], data[5])
 		return post
 
 	def insertPost(self, post):
@@ -44,9 +48,6 @@ class DBFucker:
 
 
 
-
-
-
 if __name__ == '__main__':
 	#createTable()
 	db = DBFucker()
@@ -54,3 +55,4 @@ if __name__ == '__main__':
 	for post in posts:
 		post.show()
 	
+	caonima = Post()
